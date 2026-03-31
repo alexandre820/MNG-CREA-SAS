@@ -1,0 +1,2721 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mush n Go Créa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Mush n Go Créa — Premium Dark UI
+   ============================================================ */
+:root {
+  --bg-sidebar: #0F0A1A;
+  --bg-main: #FAFAFA;
+  --bg-main-dark: #0D0D12;
+  --bg-card: #ffffff;
+  --bg-card-dark: #161622;
+  --accent: #7643DE;
+  --accent-light: #9B6FEE;
+  --accent-bg: rgba(118,67,222,0.08);
+  --accent-secondary: #F9F784;
+  --accent-secondary-bg: rgba(249,247,132,0.12);
+  --text-primary: #1a1a2e;
+  --text-secondary: #64648C;
+  --text-muted: #9898B0;
+  --text-white: #ffffff;
+  --text-white-secondary: #8B8BA0;
+  --border: #EEEEF2;
+  --border-dark: #252540;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 20px;
+  --shadow: 0 1px 2px rgba(15,10,26,0.04);
+  --shadow-lg: 0 12px 32px rgba(118,67,222,0.08);
+  --transition: 0.2s cubic-bezier(0.4,0,0.2,1);
+  --sidebar-width: 250px;
+  --font-sans: 'DM Sans', -apple-system, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-main);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+/* ---- Layout ---- */
+.app-layout {
+  display: flex;
+  height: 100vh;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: var(--sidebar-width);
+  background: linear-gradient(180deg, #0F0A1A 0%, #1A1030 100%);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 28px;
+  border-bottom: 1px solid var(--border-dark);
+  margin-bottom: 24px;
+  cursor: pointer;
+}
+.sidebar-logo svg { width: 28px; height: 28px; color: var(--accent); }
+.sidebar-logo span {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-white);
+  letter-spacing: -0.3px;
+}
+.sidebar-logo em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.nav-section {
+  margin-bottom: 24px;
+}
+.nav-section-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-white-secondary);
+  padding: 0 12px;
+  margin-bottom: 8px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-white-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: var(--transition);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.nav-item:hover { background: rgba(255,255,255,0.06); color: var(--text-white); }
+.nav-item.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-left: 4px solid var(--accent);
+  padding-left: 8px;
+  font-weight: 600;
+}
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+.sidebar-footer { margin-top: auto; padding-top: 20px; }
+.sidebar-upgrade {
+  background: var(--accent-secondary);
+  color: #1A1A2E;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  border: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: var(--transition);
+}
+.sidebar-upgrade:hover { filter: brightness(1.05); }
+
+.fal-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-white-secondary);
+  margin-top: 12px;
+}
+.fal-status .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.fal-status .dot.ok { background: #22c55e; }
+.fal-status .dot.err { background: #ef4444; }
+
+/* ---- Main content area ---- */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px 40px 100px;
+  transition: opacity 0.2s ease;
+}
+.main-content.page-enter {
+  animation: pageIn 0.25s ease forwards;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Page header ---- */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: -40px -40px 32px -40px;
+  padding: 32px 40px 24px;
+  background: linear-gradient(135deg, rgba(118,67,222,0.06) 0%, rgba(249,247,132,0.04) 50%, transparent 100%);
+  border-bottom: 1px solid var(--border);
+}
+.page-header h1 {
+  font-family: var(--font-sans);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+}
+.page-header h1 em {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 700;
+}
+.page-header p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  margin-top: 6px;
+}
+
+/* ---- Buttons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.btn svg { width: 16px; height: 16px; }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn-cta {
+  background: var(--accent-secondary);
+  color: #1A1A2E;
+}
+.btn-cta:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { border-color: var(--accent); }
+.btn-danger {
+  background: rgba(239,68,68,0.1);
+  color: #ef4444;
+}
+.btn-danger:hover { background: rgba(239,68,68,0.2); }
+.btn-ghost {
+  background: none;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+}
+.btn-ghost:hover { color: var(--accent); }
+.btn-lg { padding: 14px 28px; font-size: 15px; border-radius: var(--radius); }
+
+/* ---- Cards ---- */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+.card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+}
+
+/* ---- Stats grid ---- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.stat-card { padding: 20px; }
+.stat-value {
+  font-family: var(--font-serif);
+  font-size: 36px;
+  color: var(--text-primary);
+  line-height: 1;
+  margin: 8px 0 4px;
+}
+.stat-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ---- Image grid ---- */
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.image-card {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  group: true;
+}
+.image-card img {
+  width: 100%;
+  aspect-ratio: 4/5;
+  object-fit: cover;
+  display: block;
+  transition: var(--transition);
+}
+.image-card:hover img { transform: scale(1.03); }
+.image-card .overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+  opacity: 0;
+  transition: var(--transition);
+  display: flex;
+  align-items: flex-end;
+  padding: 16px;
+}
+.image-card:hover .overlay { opacity: 1; }
+.image-card .overlay .actions {
+  display: flex;
+  gap: 8px;
+}
+.image-card .overlay .actions button {
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(8px);
+  border: none;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: var(--transition);
+}
+.image-card .overlay .actions button:hover { background: var(--accent); color: #111; }
+
+.image-card .badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.badge-completed { background: rgba(34,197,94,0.15); color: #22c55e; }
+.badge-generating { background: var(--accent-secondary-bg); color: #8a8520; }
+.badge-pending { background: rgba(150,150,150,0.15); color: #999; }
+.badge-failed { background: rgba(239,68,68,0.15); color: #ef4444; }
+.badge-ratio {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ---- Generation form ---- */
+.gen-form { max-width: 900px; }
+.form-section {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(118,67,222,0.08);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.form-section:hover { border-color: rgba(118,67,222,0.15); box-shadow: 0 4px 16px rgba(118,67,222,0.06); }
+.form-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+.form-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.form-group {
+  flex: 1;
+  min-width: 200px;
+}
+.form-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  transition: var(--transition);
+}
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+.form-group textarea { min-height: 80px; resize: vertical; }
+
+/* ---- Pill selector ---- */
+.pill-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pill {
+  padding: 7px 16px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1.5px solid var(--border);
+  background: white;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: var(--text-secondary);
+}
+.pill:hover { border-color: var(--accent); color: var(--accent); }
+.pill.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(118,67,222,0.25);
+}
+
+/* ---- Slider ---- */
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.slider-container input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  border: none;
+  padding: 0;
+}
+.slider-container input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-secondary);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+.slider-value {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  min-width: 36px;
+  text-align: center;
+}
+
+/* ---- Product cards ---- */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.product-grid.compact-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.product-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: var(--transition);
+}
+.product-card.compact-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 28px;
+}
+.product-card.compact-pill h3 {
+  font-size: 13px;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.product-card.compact-pill .product-images-row {
+  gap: 0;
+}
+.product-card.compact-pill .product-images-row img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  margin-right: -6px;
+}
+.product-card.active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.product-card:hover { border-color: var(--accent); cursor: pointer; }
+.product-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.product-images-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+.product-images-row img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* ---- Bottom bar ---- */
+.gen-bottom-bar {
+  position: sticky;
+  bottom: -100px;
+  margin: 32px -40px -100px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border);
+  padding: 14px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 100;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.04);
+}
+.gen-summary {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.gen-summary strong { color: var(--accent); font-size: 15px; }
+.btn-cta.btn-lg.gen-main-cta {
+  background: var(--accent-secondary);
+  color: #0F0A1A;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 14px 32px;
+  border-radius: 100px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(249,247,132,0.3);
+  letter-spacing: 0.8px;
+  transition: all 0.2s ease;
+}
+.btn-cta.btn-lg.gen-main-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(249,247,132,0.4);
+}
+
+/* ---- Collapsible ---- */
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 16px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+.collapsible-header .chevron {
+  transition: var(--transition);
+}
+.collapsible-header.open .chevron {
+  transform: rotate(180deg);
+}
+.collapsible-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.collapsible-body.open {
+  max-height: 800px;
+}
+
+/* ---- Tags ---- */
+.tags-input {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-main);
+  min-height: 44px;
+  cursor: text;
+}
+.tags-input .tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--accent-secondary-bg);
+  color: #8a8520;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.tags-input .tag button {
+  background: none;
+  border: none;
+  color: #8a8520;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+}
+.tags-input input {
+  border: none;
+  outline: none;
+  background: none;
+  flex: 1;
+  min-width: 120px;
+  font-size: 13px;
+  padding: 4px;
+}
+
+/* ---- Modal ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition);
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  max-width: 560px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  transform: scale(0.95);
+  transition: var(--transition);
+}
+.modal-overlay.open .modal { transform: scale(1); }
+.modal h2 {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+.modal .form-group { margin-bottom: 16px; }
+
+/* ---- Empty state ---- */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+.empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.4; }
+.empty-state h3 { font-size: 16px; margin-bottom: 8px; color: var(--text-secondary); }
+.empty-state p { font-size: 14px; }
+
+/* ---- Loading ---- */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.generating-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ---- Lightbox ---- */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: var(--transition);
+}
+.lightbox.open { opacity: 1; pointer-events: all; }
+.lightbox img {
+  max-width: 90%;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+}
+.lightbox .close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---- Settings ---- */
+.settings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 800px;
+}
+.settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  transition: var(--transition);
+}
+.settings-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.settings-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.settings-card p { font-size: 13px; color: var(--text-muted); }
+
+/* ---- File upload ---- */
+.file-drop {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.file-drop:hover, .file-drop.dragover {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.file-drop input { display: none; }
+
+/* ---- Responsive ---- */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main-content { padding: 20px; }
+  .gen-bottom-bar { left: 0; }
+  .page-header h1 { font-size: 28px; }
+  .form-row { flex-direction: column; }
+  .settings-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Scrollbar ---- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ---- Strategy section ---- */
+.strategy-section { margin-top: 24px; }
+.strategy-section .card { margin-bottom: 16px; }
+.strategy-section .form-group { margin-bottom: 16px; }
+.strategy-section .form-group:last-child { margin-bottom: 0; }
+
+.tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.tag-suggestions button {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid rgba(118,67,222,0.2);
+  padding: 4px 12px;
+  border-radius: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.tag-suggestions button:hover {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* ---- Competitors list ---- */
+.competitor-list { display: flex; flex-direction: column; gap: 8px; }
+.competitor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-main);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.competitor-row .comp-name { font-size: 14px; font-weight: 600; }
+.competitor-row .comp-url { font-size: 12px; color: var(--text-muted); }
+.competitor-row .comp-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.comp-badge.direct { background: rgba(239,68,68,0.1); color: #ef4444; }
+.comp-badge.indirect { background: rgba(234,179,8,0.1); color: #ca8a04; }
+.competitor-row .comp-delete {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: var(--transition);
+}
+.competitor-row .comp-delete:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
+
+.competitor-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 12px;
+  background: var(--bg-main);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+}
+.competitor-form .form-group { min-width: 140px; margin-bottom: 0; }
+.competitor-form input, .competitor-form select {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* ---- Funnel pills ---- */
+.funnel-pills {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.funnel-pills .pill { position: relative; padding-left: 24px; font-size: 12px; padding-top: 5px; padding-bottom: 5px; }
+.funnel-pills .pill::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.funnel-pills .pill[data-value="TOFU"]::before { background: #22c55e; }
+.funnel-pills .pill[data-value="MOFU"]::before { background: #f59e0b; }
+.funnel-pills .pill[data-value="BOFU"]::before { background: #ef4444; }
+.funnel-pills .pill.active[data-value="TOFU"] { background: rgba(34,197,94,0.1); color: #16a34a; border-color: rgba(34,197,94,0.3); }
+.funnel-pills .pill.active[data-value="MOFU"] { background: rgba(245,158,11,0.1); color: #d97706; border-color: rgba(245,158,11,0.3); }
+.funnel-pills .pill.active[data-value="BOFU"] { background: rgba(239,68,68,0.1); color: #dc2626; border-color: rgba(239,68,68,0.3); }
+
+/* ---- AI Strategist cards ---- */
+.strategy-suggest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent), #9B6FEE);
+  color: #fff;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.strategy-suggest-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.strategy-suggest-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.strategy-suggest-btn .spinner { width: 16px; height: 16px; border-width: 2px; }
+
+.angle-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.angle-card {
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.angle-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px var(--accent-bg);
+  transform: translateY(-2px);
+}
+.angle-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.angle-card .angle-funnel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+.angle-funnel::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.angle-funnel.tofu { background: rgba(34,197,94,0.08); color: #16a34a; }
+.angle-funnel.tofu::before { background: #22c55e; }
+.angle-funnel.mofu { background: rgba(245,158,11,0.08); color: #d97706; }
+.angle-funnel.mofu::before { background: #f59e0b; }
+.angle-funnel.bofu { background: rgba(239,68,68,0.08); color: #dc2626; }
+.angle-funnel.bofu::before { background: #ef4444; }
+.angle-funnel.problem_aware { background: rgba(34,197,94,0.08); color: #16a34a; }
+.angle-funnel.problem_aware::before { background: #22c55e; }
+.angle-funnel.solution_aware { background: rgba(245,158,11,0.08); color: #d97706; }
+.angle-funnel.solution_aware::before { background: #f59e0b; }
+.angle-funnel.product_aware { background: rgba(239,68,68,0.08); color: #dc2626; }
+.angle-funnel.product_aware::before { background: #ef4444; }
+.angle-card .angle-text { font-size: 13px; font-weight: 600; margin-bottom: 3px; line-height: 1.3; }
+.angle-card .angle-headline { font-size: 12px; color: var(--accent); font-style: italic; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.angle-card .angle-rationale { font-size: 11px; color: var(--text-muted); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+/* ---- Studio masonry grid ---- */
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1100px) { .studio-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { .studio-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .studio-grid { grid-template-columns: 1fr; } }
+
+.studio-grid .image-card img {
+  width: 100%;
+  aspect-ratio: 4/5;
+  object-fit: cover;
+  display: block;
+}
+.studio-grid .image-card {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+.studio-grid .image-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+.studio-grid .image-card.winner-card {
+  border-color: #22c55e;
+  box-shadow: 0 0 20px rgba(34,197,94,0.2);
+}
+.studio-grid .image-card.kill-card {
+  border-color: #ef4444;
+  opacity: 0.6;
+}
+.studio-grid .image-card.kill-card:hover { opacity: 0.85; }
+
+.image-comment {
+  padding: 8px;
+  background: rgba(250,250,250,0.95);
+  border-top: 1px solid var(--border);
+}
+.image-comment input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.95);
+  font-family: var(--font-sans);
+  box-sizing: border-box;
+}
+.image-comment input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+.studio-card-wrapper {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+.studio-card-wrapper:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+.studio-card-wrapper.winner-card {
+  border-color: #22c55e;
+  box-shadow: 0 0 20px rgba(34,197,94,0.2);
+}
+.studio-card-wrapper.kill-card {
+  border-color: #ef4444;
+  opacity: 0.6;
+}
+.studio-card-wrapper.kill-card:hover { opacity: 0.85; }
+.studio-card-wrapper .image-card {
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  overflow: hidden;
+}
+.studio-card-wrapper .image-card:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.batch-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 6px 0;
+}
+.batch-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.batch-header .batch-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.batch-header .batch-meta .badge {
+  position: static;
+  display: inline-block;
+}
+
+/* ---- Angle suggestion pills (generation page) ---- */
+.angle-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.angle-pills-row .pill {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border: 1px solid rgba(118,67,222,0.15);
+  border-radius: 100px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.angle-pills-row .pill:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.angle-pills-row .pill.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo" onclick="navigate('home')">
+      <span style="font-size:22px;">🍄</span>
+      <span>MNG <em>Créa</em></span>
+    </div>
+
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">General</div>
+        <button class="nav-item" data-page="home" onclick="navigate('home')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Accueil
+        </button>
+        <button class="nav-item" data-page="brand" onclick="navigate('brand')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Ma marque
+        </button>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Outils Creatifs</div>
+        <button class="nav-item" data-page="generate" onclick="navigate('generate')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Generation
+        </button>
+        <button class="nav-item" data-page="studio" onclick="navigate('studio')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Studio
+        </button>
+        <button class="nav-item" data-page="inspirations" onclick="navigate('inspirations')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Inspirations
+        </button>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">Compte & Espace</div>
+        <button class="nav-item" data-page="settings" onclick="navigate('settings')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Parametres
+        </button>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="fal-status" id="fal-status">
+        <span class="dot err"></span>
+        <span>FAL API</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main-content" id="main-content">
+    <!-- Pages rendered here by JS -->
+  </main>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="close-btn" onclick="closeLightbox()">&times;</button>
+  <img id="lightbox-img" src="" alt="">
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+// ============================================================
+// MNG Créa Frontend — SPA Logic
+// ============================================================
+
+const API = '';
+let currentPage = (location.hash && location.hash.slice(1)) || 'home';
+let state = {
+  stats: {},
+  brands: [],
+  currentBrand: null,
+  products: [],
+  generations: [],
+  falConfigured: false,
+  strategy: null,
+  competitors: [],
+  selectedProductId: '',
+};
+
+// Polling for active generations
+let genPollInterval = null;
+
+// ---- Navigation ----
+function navigate(page) {
+  currentPage = page;
+  location.hash = page;
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  renderPage();
+}
+
+function renderPage() {
+  const main = document.getElementById('main-content');
+  main.classList.remove('page-enter');
+  void main.offsetWidth; // force reflow
+  main.classList.add('page-enter');
+  try {
+    switch (currentPage) {
+      case 'home': renderHome(main); break;
+      case 'brand': renderBrand(main); break;
+      case 'generate': renderGenerate(main); break;
+      case 'studio': renderStudio(main); break;
+      case 'inspirations': renderInspirations(main); break;
+      case 'settings': renderSettings(main); break;
+    }
+  } catch(e) {
+    console.error('Render error:', e);
+    main.innerHTML = `<div style="color:red;padding:40px;"><h2>Erreur de rendu: ${currentPage}</h2><pre>${e.message}\n${e.stack}</pre></div>`;
+  }
+}
+
+// ---- API helpers ----
+async function api(path, options = {}) {
+  const resp = await fetch(API + path, options);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+    throw new Error(err.detail || 'API Error');
+  }
+  return resp.json();
+}
+
+async function loadState() {
+  try {
+    const [stats, brands, gens, falStatus, inspirations, templates] = await Promise.all([
+      api('/api/stats'),
+      api('/api/brands'),
+      api('/api/generations'),
+      api('/api/fal-status'),
+      api('/api/inspirations'),
+      api('/api/templates'),
+    ]);
+    state.stats = stats;
+    state.brands = brands;
+    state.generations = gens;
+    state.falConfigured = falStatus.configured;
+    state.inspirations = inspirations || [];
+    state.templates = templates || [];
+
+    // Update FAL status dot
+    const dot = document.querySelector('#fal-status .dot');
+    const label = document.querySelector('#fal-status span:last-child');
+    if (state.falConfigured) {
+      dot.className = 'dot ok';
+      label.textContent = 'FAL API connectee';
+    } else {
+      dot.className = 'dot err';
+      label.textContent = 'FAL API non configuree';
+    }
+
+    // Auto-select first brand
+    if (brands.length > 0 && !state.currentBrand) {
+      state.currentBrand = brands[0];
+      const products = await api(`/api/brands/${brands[0].id}/products`);
+      state.products = products;
+      if (state.products.length && !state.selectedProductId) {
+        state.selectedProductId = state.products[0].id;
+      }
+    }
+
+    // Load strategy & competitors for current brand
+    if (brands.length > 0) {
+      const brandId = state.currentBrand?.id || brands[0].id;
+      const [strategy, competitors] = await Promise.all([
+        api(`/api/brands/${brandId}/strategy`).catch(() => null),
+        api(`/api/brands/${brandId}/competitors`).catch(() => []),
+      ]);
+      state.strategy = strategy;
+      state.competitors = competitors || [];
+    }
+  } catch (e) {
+    console.error('Load state error:', e);
+  }
+}
+
+// ---- HOME PAGE ----
+function renderHome(el) {
+  const s = state.stats;
+  const recentGens = state.generations.slice(0, 5);
+  const brandName = state.currentBrand?.name || 'MNG Créa';
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Bienvenue, <em>${brandName}</em></h1>
+        <p>Voici l'etat de votre empire creatif aujourd'hui.</p>
+      </div>
+      <button class="btn btn-primary btn-lg" onclick="navigate('generate')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+        Nouveau Batch
+      </button>
+    </div>
+
+    <div class="stats-grid">
+      <div class="card stat-card">
+        <div class="card-title">Total Creations</div>
+        <div class="stat-value">${s.total_images || 0}</div>
+        <div class="stat-label">Images generees par l'IA</div>
+      </div>
+      <div class="card stat-card">
+        <div class="card-title">Generations</div>
+        <div class="stat-value">${s.total_generations || 0}</div>
+        <div class="stat-label">Batches lances</div>
+      </div>
+      <div class="card stat-card">
+        <div class="card-title">Marques Actives</div>
+        <div class="stat-value">${s.brands || 0}</div>
+        <div class="stat-label">Profils configures</div>
+      </div>
+      <div class="card stat-card">
+        <div class="card-title">Produits</div>
+        <div class="stat-value">${s.products || 0}</div>
+        <div class="stat-label">Avec packshots</div>
+      </div>
+    </div>
+
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;">Dernieres Creations</h2>
+    ${recentGens.length > 0 ? `
+      <div class="image-grid">
+        ${recentGens.flatMap(g => g.images.map(img => `
+          <div class="image-card" onclick="openLightbox('/api/image/${img.id}')">
+            <img src="/api/image/${img.id}" alt="${img.filename}" loading="lazy">
+            <span class="badge badge-${g.status}">${g.status}</span>
+            <span class="badge-ratio">${g.aspect_ratio || '4:5'}</span>
+            <div class="overlay">
+              <div class="actions">
+                <button onclick="event.stopPropagation(); downloadImage('/api/image/${img.id}', '${img.filename}')">Telecharger</button>
+                <button onclick="event.stopPropagation(); deleteGenImage('${img.id}')">Supprimer</button>
+              </div>
+            </div>
+          </div>
+        `)).join('')}
+      </div>
+    ` : `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <h3>Aucune creation pour l'instant</h3>
+        <p>Lancez votre premier batch pour commencer.</p>
+      </div>
+    `}
+  `;
+}
+
+// ---- BRAND PAGE ----
+function renderBrand(el) {
+  const brand = state.currentBrand;
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Ma <em>Marque</em></h1>
+        <p>Gerez votre profil de marque et vos photos produits.</p>
+      </div>
+      <button class="btn btn-primary" onclick="showBrandModal()">
+        ${brand ? 'Editer le profil' : 'Creer une marque'}
+      </button>
+    </div>
+
+    ${brand ? `
+      <div class="card" style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="width:56px;height:56px;border-radius:12px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#111;">
+            ${brand.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <h2 style="font-size:20px;font-weight:600;">${brand.name}</h2>
+            ${brand.url ? `<p style="font-size:13px;color:var(--text-muted);">${brand.url}</p>` : ''}
+          </div>
+        </div>
+      </div>
+    ` : `
+      <div class="empty-state">
+        <h3>Aucune marque configuree</h3>
+        <p>Creez votre profil de marque pour commencer a generer des creas.</p>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="showBrandModal()">Creer une marque</button>
+      </div>
+    `}
+
+    ${brand ? `
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <span class="card-title">Photos Produits</span>
+            <span style="background:var(--accent);color:#111;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;margin-left:8px;">${state.products.reduce((s, p) => s + (p.images?.length || 0), 0)} total</span>
+          </div>
+          <button class="btn btn-secondary" onclick="showProductModal()">Ajouter un produit +</button>
+        </div>
+
+        ${state.products.length > 0 ? `
+          <div class="product-grid">
+            ${state.products.map(p => `
+              <div class="product-card">
+                <h3>${p.name}</h3>
+                <div class="product-images-row">
+                  ${(p.images || []).map(img => `
+                    <img src="/api/image/${img.id}" alt="${img.filename}" onclick="openLightbox('/api/image/${img.id}')">
+                  `).join('')}
+                  ${(p.images || []).length === 0 ? '<span style="color:var(--text-muted);font-size:13px;">Aucune image</span>' : ''}
+                </div>
+                <div style="margin-top:8px;display:flex;gap:8px;">
+                  <button class="btn btn-ghost" onclick="addImagesToProduct('${p.id}')">+ Images</button>
+                  <span style="font-size:12px;color:var(--text-muted);line-height:32px;">${(p.images || []).length} photo(s)</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : `
+          <div class="empty-state" style="padding:32px;">
+            <p>Ajoutez vos produits et packshots pour ameliorer la generation.</p>
+          </div>
+        `}
+      </div>
+
+      <!-- Strategy Section -->
+      <div class="strategy-section">
+        <h2 style="font-family:var(--font-serif);font-size:24px;margin:32px 0 16px;">Strategie <em style="color:var(--accent);font-style:italic;">Creative</em></h2>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Avatar Client</span>
+          </div>
+          <div class="form-group">
+            <label>Description de l'avatar</label>
+            <textarea id="strat-avatar" rows="3" placeholder="Ex: Homme/femme 25-40 ans, actif(ve), consomme du cafe, veut performer sans crash...">${state.strategy?.avatar_description || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Pain Points</label>
+            <div class="tags-input" id="strat-pains" onclick="this.querySelector('input')?.focus()">
+              ${(state.strategy?.avatar_pain_points || []).map(p => `<span class="tag">${p} <button onclick="this.parentElement.remove()">&times;</button></span>`).join('')}
+              <input type="text" placeholder="Ajouter un pain point..." onkeydown="handleTagInput(event, 'strat-pains')">
+            </div>
+            <div class="tag-suggestions">
+              ${['Ballonnements', 'Crash cafe', 'Manque de focus', 'Stress chronique', 'Fatigue', 'Sommeil perturbe', 'Digestion difficile', 'Anxiete'].map(s =>
+                `<button onclick="addSuggestedTag('strat-pains', '${s}')">${s}</button>`
+              ).join('')}
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Desires</label>
+            <div class="tags-input" id="strat-desires" onclick="this.querySelector('input')?.focus()">
+              ${(state.strategy?.avatar_desires || []).map(d => `<span class="tag">${d} <button onclick="this.parentElement.remove()">&times;</button></span>`).join('')}
+              <input type="text" placeholder="Ajouter un desir..." onkeydown="handleTagInput(event, 'strat-desires')">
+            </div>
+            <div class="tag-suggestions">
+              ${['Energie stable', 'Focus au travail', 'Mieux dormir', 'Zen au quotidien', 'Performance mentale', 'Alternative saine', 'Ingredients naturels'].map(s =>
+                `<button onclick="addSuggestedTag('strat-desires', '${s}')">${s}</button>`
+              ).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Positionnement</span>
+          </div>
+          <div class="form-group">
+            <label>USP (Proposition de valeur unique)</label>
+            <textarea id="strat-usp" rows="2" placeholder="Ex: Le premier cafe adapto francais qui remplace ton cafe sans compromis...">${state.strategy?.usp || ''}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Offres</label>
+            <div class="tags-input" id="strat-offers" onclick="this.querySelector('input')?.focus()">
+              ${(state.strategy?.offers || []).map(o => `<span class="tag">${o} <button onclick="this.parentElement.remove()">&times;</button></span>`).join('')}
+              <input type="text" placeholder="Ajouter une offre..." onkeydown="handleTagInput(event, 'strat-offers')">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Ton de voix</label>
+            <textarea id="strat-tone" rows="2" placeholder="Ex: Direct, cool, scientifique mais accessible, jamais condescendant...">${state.strategy?.tone_of_voice || ''}</textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Concurrents</span>
+            <button class="btn btn-secondary" onclick="toggleCompetitorForm()" style="font-size:12px;padding:6px 14px;">Ajouter un concurrent +</button>
+          </div>
+          <div class="competitor-list" id="competitor-list">
+            ${(state.competitors || []).map(c => `
+              <div class="competitor-row">
+                <div>
+                  <div class="comp-name">${c.name}</div>
+                  ${c.url ? `<div class="comp-url">${c.url}</div>` : ''}
+                </div>
+                <span class="comp-badge ${c.type || 'direct'}">${c.type || 'direct'}</span>
+                <button class="comp-delete" onclick="deleteCompetitor('${c.id}')" title="Supprimer">&times;</button>
+              </div>
+            `).join('')}
+            ${(state.competitors || []).length === 0 ? '<p style="font-size:13px;color:var(--text-muted);padding:8px 0;">Aucun concurrent ajoute.</p>' : ''}
+          </div>
+          <div id="competitor-form-wrapper" style="display:none;">
+            <div class="competitor-form">
+              <div class="form-group" style="flex:2;">
+                <label>Nom</label>
+                <input type="text" id="comp-name" placeholder="Ex: RYZE">
+              </div>
+              <div class="form-group" style="flex:2;">
+                <label>URL</label>
+                <input type="text" id="comp-url" placeholder="https://...">
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Type</label>
+                <select id="comp-type">
+                  <option value="direct">Direct</option>
+                  <option value="indirect">Indirect</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="addCompetitor()" style="padding:8px 16px;font-size:12px;align-self:flex-end;">Ajouter</button>
+            </div>
+            <div class="tag-suggestions" style="margin-top:8px;">
+              <span style="font-size:11px;color:var(--text-muted);margin-right:4px;">Suggestions:</span>
+              ${[
+                {name:'RYZE',url:'ryzesuperfoods.com',type:'direct'},
+                {name:'Everyday Dose',url:'everydaydose.com',type:'direct'},
+                {name:'Four Sigmatic',url:'foursigmatic.com',type:'direct'},
+                {name:'AG1',url:'drinkag1.com',type:'indirect'},
+              ].map(s => `<button onclick="prefillCompetitor('${s.name}','${s.url}','${s.type}')">${s.name}</button>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary btn-lg" onclick="saveStrategy()">Sauvegarder la strategie</button>
+        </div>
+      </div>
+    ` : ''}
+  `;
+}
+
+// ---- GENERATE PAGE ----
+function renderGenerate(el) {
+  const brand = state.currentBrand;
+  if (!brand) {
+    el.innerHTML = `
+      <div class="empty-state" style="padding-top:100px;">
+        <h3>Configurez d'abord votre marque</h3>
+        <p>Allez dans "Ma marque" pour creer votre profil.</p>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="navigate('brand')">Configurer ma marque</button>
+      </div>
+    `;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Generation <em>MNG</em></h1>
+        <p>Configurez et lancez votre campagne creative en masse.</p>
+      </div>
+    </div>
+
+    ${!state.falConfigured ? `
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div>
+          <strong style="color:#ef4444;">FAL API non configuree</strong>
+          <p style="font-size:13px;color:var(--text-secondary);margin-top:2px;">Lancez le serveur avec: <code>FAL_KEY=votre-cle python server.py</code></p>
+        </div>
+      </div>
+    ` : ''}
+
+    <div class="gen-form">
+      <div class="form-section">
+        <div class="form-section-title">Configuration Generale</div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombre de creations</label>
+            <div class="slider-container">
+              <input type="range" id="gen-count" min="1" max="20" value="4" oninput="document.getElementById('gen-count-val').textContent=this.value">
+              <div class="slider-value" id="gen-count-val">4</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Format d'export</label>
+            <div class="pill-group" id="format-pills">
+              <button class="pill" onclick="selectPill(this, 'format-pills')" data-value="1:1">1:1</button>
+              <button class="pill active" onclick="selectPill(this, 'format-pills')" data-value="4:5">4:5</button>
+              <button class="pill" onclick="selectPill(this, 'format-pills')" data-value="9:16">9:16</button>
+              <button class="pill" onclick="selectPill(this, 'format-pills')" data-value="16:9">16:9</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Resolution</label>
+            <div class="pill-group" id="resolution-pills">
+              <button class="pill" onclick="selectPill(this, 'resolution-pills')" data-value="1K">1K</button>
+              <button class="pill active" onclick="selectPill(this, 'resolution-pills')" data-value="2K">2K</button>
+              <button class="pill" onclick="selectPill(this, 'resolution-pills')" data-value="4K">4K</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">Produit Source</div>
+        <div class="product-grid compact-pills">
+          ${state.products.map((p, i) => `
+            <div class="product-card compact-pill ${state.selectedProductId === p.id || (!state.selectedProductId && i === 0) ? 'active' : ''}" onclick="selectProduct(this, '${p.id}')" data-product-id="${p.id}">
+              <div class="product-images-row">
+                ${(p.images || []).slice(0, 2).map(img => `
+                  <img src="/api/image/${img.id}" alt="${img.filename}">
+                `).join('')}
+              </div>
+              <h3>${p.name}</h3>
+            </div>
+          `).join('')}
+          ${state.products.length === 0 ? '<p style="color:var(--text-muted);font-size:13px;">Aucun produit. Ajoutez-en dans "Ma marque".</p>' : ''}
+        </div>
+      </div>
+
+      <!-- ANGLE MARKETING — le champ principal -->
+      <div class="form-section">
+        <div class="form-section-title">Angle Marketing</div>
+        <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">Decris l'angle ou le probleme client que tu veux adresser.</p>
+        <textarea id="angle-input" placeholder="Ex: ballonnements, crash du cafe, focus au travail, stress..."
+               style="width:100%;padding:12px 16px;border-radius:var(--radius);border:1px solid var(--border);font-size:14px;font-family:var(--font-sans);background:var(--bg-card);min-height:56px;resize:vertical;" rows="2"></textarea>
+        <div class="angle-pills-row" id="angle-suggestions">
+          <button class="pill" onclick="setAngle(this)" data-value="ballonnements & digestion">Ballonnements</button>
+          <button class="pill" onclick="setAngle(this)" data-value="crash du cafe, fatigue apres-midi">Crash cafe</button>
+          <button class="pill" onclick="setAngle(this)" data-value="manque de focus et concentration">Focus</button>
+          <button class="pill" onclick="setAngle(this)" data-value="stress et anxiete au quotidien">Stress</button>
+          <button class="pill" onclick="setAngle(this)" data-value="energie stable toute la journee">Energie</button>
+          <button class="pill" onclick="setAngle(this)" data-value="alternative naturelle au cafe">Cafe naturel</button>
+          <button class="pill" onclick="setAngle(this)" data-value="sommeil de mauvaise qualite">Sommeil</button>
+          <button class="pill" onclick="setAngle(this)" data-value="ingredients 100% naturels, zero cochonnerie">Clean label</button>
+        </div>
+      </div>
+
+      <!-- Funnel Stage -->
+      <div class="form-section">
+        <div class="form-section-title">Etape du Funnel</div>
+        <div class="funnel-pills" id="funnel-pills">
+          <button class="pill" onclick="selectPill(this, 'funnel-pills')" data-value="TOFU">TOFU &mdash; Decouverte</button>
+          <button class="pill active" onclick="selectPill(this, 'funnel-pills')" data-value="MOFU">MOFU &mdash; Consideration</button>
+          <button class="pill" onclick="selectPill(this, 'funnel-pills')" data-value="BOFU">BOFU &mdash; Conversion</button>
+        </div>
+      </div>
+
+      <!-- IA Stratege -->
+      <div class="form-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+          <div class="form-section-title" style="margin-bottom:0;">IA Stratege</div>
+          <button class="strategy-suggest-btn" id="suggest-angles-btn" onclick="suggestAngles()" style="font-size:12px;padding:7px 16px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Suggerer des angles
+          </button>
+        </div>
+        <div id="angle-cards-container"></div>
+      </div>
+
+      <!-- Reference visuelle — upload rapide OU biblio -->
+      <div class="form-section">
+        <div class="form-section-title">Reference Visuelle <span style="font-weight:400;letter-spacing:0;text-transform:none;font-size:10px;color:var(--text-muted);">(optionnel)</span></div>
+
+        <!-- Quick upload zone -->
+        <div id="quick-upload-zone" style="border:2px dashed var(--border);border-radius:var(--radius);padding:16px;text-align:center;cursor:pointer;margin-bottom:12px;transition:var(--transition);"
+             onclick="document.getElementById('quick-upload-input').click()"
+             ondragover="event.preventDefault();this.style.borderColor='var(--accent)';this.style.background='var(--accent-bg)'"
+             ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
+             ondrop="handleQuickDrop(event)">
+          <div id="quick-upload-preview" style="display:none;margin-bottom:8px;">
+            <img id="quick-upload-img" style="max-height:120px;border-radius:8px;object-fit:cover;">
+            <button onclick="event.stopPropagation();clearQuickUpload()" style="display:block;margin:8px auto 0;background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;">✕ Retirer</button>
+          </div>
+          <div id="quick-upload-placeholder">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <p style="font-size:13px;color:var(--text-muted);margin:0;">Glisse une crea concurrent ici ou clique pour uploader</p>
+          </div>
+          <input type="file" id="quick-upload-input" accept="image/*" style="display:none;" onchange="handleQuickUpload(this)">
+        </div>
+
+        <!-- Library selector -->
+        ${(state.inspirations || []).length > 0 ? `
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">Ou choisis depuis ta bibliotheque :</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="inspo-selector">
+          <div class="product-card" onclick="selectInspo(this, '')" data-inspo-id="" style="min-width:60px;padding:8px;text-align:center;cursor:pointer;font-size:12px;">
+            Aucune
+          </div>
+          ${state.inspirations.map(i => `
+            <div class="product-card" onclick="selectInspo(this, '${i.id}')" data-inspo-id="${i.id}" style="padding:3px;cursor:pointer;">
+              <img src="/api/inspiration-image/${i.id}" style="width:60px;height:75px;object-fit:cover;border-radius:6px;">
+            </div>
+          `).join('')}
+        </div>
+        ` : ''}
+      </div>
+
+      <!-- Templates sauvegardes -->
+      ${(state.templates || []).length > 0 ? `
+      <div class="form-section">
+        <div class="form-section-title">Templates Sauvegardes</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${state.templates.map(t => `
+            <div style="display:flex;align-items:center;gap:4px;">
+              <button class="pill" onclick="loadTemplate(${JSON.stringify(t).replace(/"/g, '&quot;')})" style="cursor:pointer;">
+                ${t.name}
+              </button>
+              <button onclick="deleteTemplate('${t.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:12px;">×</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Options avancees (prompt custom) -->
+      <div class="form-section" style="padding-bottom:8px;">
+        <div class="collapsible-header" onclick="toggleCollapsible(this)">
+          <span class="form-section-title" style="margin:0;">Prompt Personnalise (optionnel)</span>
+          <svg class="chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div class="collapsible-body" id="advanced-options">
+          <div style="padding:16px 0;">
+            <div class="form-group">
+              <label>Prompt libre</label>
+              <textarea id="custom-prompt" placeholder="Decris exactement la crea que tu veux... (remplace la generation automatique)" rows="4"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="gen-bottom-bar">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="gen-summary">
+          <strong id="summary-count">4</strong> Creas &middot; <strong id="summary-format">4:5</strong> &middot; <strong id="summary-res">2K</strong>
+        </div>
+        <button class="btn btn-ghost" onclick="saveAsTemplate()" style="font-size:11px;padding:4px 10px;">Sauver template</button>
+        <button class="btn btn-secondary" onclick="launchBatchAngles()" style="font-size:12px;padding:7px 14px;" ${!state.falConfigured ? 'disabled style="opacity:0.5"' : ''}>
+          Batch 8 Angles
+        </button>
+      </div>
+      <button class="btn btn-cta btn-lg gen-main-cta" onclick="launchGeneration()" ${!state.falConfigured ? 'disabled style="opacity:0.5"' : ''}>
+        Lancer la Generation
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </button>
+    </div>
+
+    <div style="height:80px;"></div>
+  `;
+
+  // Update summary on slider change
+  const slider = document.getElementById('gen-count');
+  if (slider) {
+    slider.addEventListener('input', updateSummary);
+  }
+}
+
+function updateSummary() {
+  const count = document.getElementById('gen-count')?.value || '4';
+  const format = document.querySelector('#format-pills .pill.active')?.dataset.value || '4:5';
+  const res = document.querySelector('#resolution-pills .pill.active')?.dataset.value || '2K';
+  const sc = document.getElementById('summary-count');
+  const sf = document.getElementById('summary-format');
+  const sr = document.getElementById('summary-res');
+  if (sc) sc.textContent = count;
+  if (sf) sf.textContent = format;
+  if (sr) sr.textContent = res;
+}
+
+function selectPill(el, groupId) {
+  document.querySelectorAll(`#${groupId} .pill`).forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  updateSummary();
+}
+
+function selectProduct(el, productId) {
+  state.selectedProductId = productId;
+  document.querySelectorAll('.product-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleCollapsible(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  body.classList.toggle('open');
+}
+
+function handleTagInput(e, containerId) {
+  if (e.key === 'Enter' && e.target.value.trim()) {
+    e.preventDefault();
+    const container = document.getElementById(containerId);
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = `${e.target.value.trim()} <button onclick="this.parentElement.remove()">&times;</button>`;
+    container.insertBefore(tag, e.target);
+    e.target.value = '';
+  }
+}
+
+function getTags(containerId) {
+  return Array.from(document.querySelectorAll(`#${containerId} .tag`))
+    .map(t => t.textContent.replace('×', '').trim());
+}
+
+function setAngle(btn) {
+  const input = document.getElementById('angle-input');
+  if (input) input.value = btn.dataset.value;
+  document.querySelectorAll('#angle-suggestions .pill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function selectInspo(el, inspoId) {
+  document.querySelectorAll('#inspo-selector .product-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  el.dataset.inspoId = inspoId;
+  // Clear quick upload if selecting from library
+  if (inspoId) clearQuickUpload();
+}
+
+// Quick upload of competitor creative directly in Generation page
+let quickUploadFile = null;
+
+function handleQuickUpload(input) {
+  if (input.files && input.files[0]) {
+    quickUploadFile = input.files[0];
+    showQuickPreview(quickUploadFile);
+  }
+}
+
+function handleQuickDrop(event) {
+  event.preventDefault();
+  const zone = document.getElementById('quick-upload-zone');
+  zone.style.borderColor = 'var(--border)';
+  zone.style.background = '';
+  if (event.dataTransfer.files && event.dataTransfer.files[0]) {
+    quickUploadFile = event.dataTransfer.files[0];
+    showQuickPreview(quickUploadFile);
+  }
+}
+
+function showQuickPreview(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    document.getElementById('quick-upload-img').src = e.target.result;
+    document.getElementById('quick-upload-preview').style.display = 'block';
+    document.getElementById('quick-upload-placeholder').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+  // Clear library selection
+  document.querySelectorAll('#inspo-selector .product-card').forEach(c => c.classList.remove('active'));
+}
+
+function clearQuickUpload() {
+  quickUploadFile = null;
+  const preview = document.getElementById('quick-upload-preview');
+  const placeholder = document.getElementById('quick-upload-placeholder');
+  if (preview) preview.style.display = 'none';
+  if (placeholder) placeholder.style.display = '';
+  const input = document.getElementById('quick-upload-input');
+  if (input) input.value = '';
+}
+
+async function launchGeneration() {
+  const brand = state.currentBrand;
+  if (!brand) return alert('Configurez d\'abord votre marque.');
+
+  const productId = document.querySelector('.product-card.active')?.dataset?.productId || '';
+  const count = document.getElementById('gen-count')?.value || 4;
+  const format = document.querySelector('#format-pills .pill.active')?.dataset.value || '4:5';
+  const resolution = document.querySelector('#resolution-pills .pill.active')?.dataset.value || '2K';
+  const angle = document.getElementById('angle-input')?.value || '';
+  const customPrompt = document.getElementById('custom-prompt')?.value || '';
+  let styleRefId = document.querySelector('#inspo-selector .product-card.active')?.dataset?.inspoId || '';
+  const funnelStage = document.querySelector('#funnel-pills .pill.active')?.dataset.value || '';
+
+  if (!angle && !customPrompt) return alert('Ecris un angle marketing ou un prompt personnalise.');
+  if (!productId) return alert('Selectionne un produit.');
+
+  // If quick upload file exists, upload it as inspiration first
+  if (quickUploadFile && !styleRefId) {
+    try {
+      const uploadForm = new FormData();
+      uploadForm.append('brand_id', brand.id);
+      uploadForm.append('label', 'Quick ref - ' + (angle || 'generation'));
+      uploadForm.append('source', 'quick-upload');
+      uploadForm.append('images', quickUploadFile);
+      const uploadResult = await fetch('/api/inspirations', { method: 'POST', body: uploadForm });
+      const uploaded = await uploadResult.json();
+      if (uploaded && uploaded[0]) styleRefId = uploaded[0].id;
+    } catch (e) { console.error('Quick upload failed:', e); }
+  }
+
+  // Prepend funnel context to the angle
+  const angleWithFunnel = funnelStage ? `[${funnelStage}] ${angle}` : angle;
+
+  const formData = new FormData();
+  formData.append('brand_id', brand.id);
+  formData.append('product_id', productId);
+  formData.append('num_creations', count);
+  formData.append('aspect_ratio', format);
+  formData.append('resolution', resolution);
+  formData.append('marketing_messages', JSON.stringify(angleWithFunnel ? [angleWithFunnel] : []));
+  formData.append('customer_reviews', JSON.stringify([]));
+  formData.append('custom_prompt', customPrompt);
+  formData.append('style_ref_id', styleRefId);
+
+  try {
+    const result = await fetch('/api/generate', { method: 'POST', body: formData });
+    const data = await result.json();
+    if (data.id) {
+      navigate('studio');
+      startPolling();
+      await loadState();
+      renderPage();
+    }
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+// ---- STUDIO PAGE ----
+function renderStudio(el) {
+  console.log('renderStudio called, gens:', state.generations?.length);
+  const gens = state.generations;
+  const allImages = gens.flatMap(g => g.images.map(img => ({ ...img, gen: g })));
+  const activeGens = gens.filter(g => g.status === 'pending' || g.status === 'generating');
+
+  if (activeGens.length > 0) startPolling();
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1><em>Studio</em></h1>
+        <p>Creations (${allImages.length})</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" onclick="navigate('generate')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          Generer des nouvelles creas
+        </button>
+        ${allImages.length > 0 ? `
+          <button class="btn btn-secondary" onclick="downloadAllImages()">Tout telecharger</button>
+        ` : ''}
+      </div>
+    </div>
+
+    ${activeGens.length > 0 ? `
+      <div style="background:var(--accent-bg);border:1px solid rgba(212,168,67,0.3);border-radius:var(--radius);padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:12px;">
+        <div class="spinner"></div>
+        <div>
+          <strong style="color:var(--accent);" class="generating-pulse">Generation en cours...</strong>
+          <p style="font-size:13px;color:var(--text-secondary);margin-top:2px;">${activeGens.length} batch(s) actif(s)</p>
+        </div>
+      </div>
+    ` : ''}
+
+    ${gens.length > 0 ? `
+      ${gens.map(g => `
+        <div style="margin-bottom:28px;">
+          <div class="batch-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <h3>${g.brand_name || 'Generation'}</h3>
+              <div class="batch-meta">
+                <span class="badge badge-${g.status}" style="position:static;">${g.status === 'completed' ? 'Termine' : g.status === 'generating' ? 'En cours' : g.status === 'failed' ? 'Echoue' : 'En attente'}</span>
+                <span>${g.aspect_ratio || '4:5'}</span>
+                <span>${g.images.length} image(s)</span>
+              </div>
+            </div>
+            <button class="btn btn-ghost btn-danger" onclick="deleteGeneration('${g.id}')" style="font-size:11px;padding:4px 10px;">Supprimer</button>
+          </div>
+          <div class="studio-grid">
+            ${g.images.map(img => `
+              <div class="studio-card-wrapper ${img.rating === 'winner' ? 'winner-card' : ''}${img.rating === 'kill' ? 'kill-card' : ''}">
+                <div class="image-card" onclick="openLightbox('/api/image/${img.id}')" style="position:relative;">
+                  <img src="/api/image/${img.id}" alt="${img.filename}" loading="lazy">
+                  <span class="badge-ratio">${g.aspect_ratio || '4:5'}</span>
+                  ${img.rating === 'winner' ? '<span style="position:absolute;top:8px;right:8px;background:#22c55e;color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;z-index:2;">WINNER</span>' : ''}
+                  ${img.rating === 'kill' ? '<span style="position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;z-index:2;">KILL</span>' : ''}
+                  <div class="overlay">
+                    <div class="actions" style="flex-wrap:wrap;gap:4px;">
+                      <button onclick="event.stopPropagation(); rateImage('${img.id}', 'winner')" style="background:rgba(34,197,94,0.85);">Winner</button>
+                      <button onclick="event.stopPropagation(); rateImage('${img.id}', 'kill')" style="background:rgba(239,68,68,0.85);">Kill</button>
+                      <button onclick="event.stopPropagation(); iterateImage('${img.id}', '${g.brand_id}', '${g.product_id}', '${g.aspect_ratio}')">Iterer</button>
+                      <button onclick="event.stopPropagation(); downloadImage('/api/image/${img.id}', '${img.filename}')">DL</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="image-comment" onclick="event.stopPropagation()">
+                  <input type="text"
+                    data-comment-id="${img.id}"
+                    placeholder="Pourquoi ? (ex: mauvais cadrage, bon hook...)"
+                    value="${(img.comment || '').replace(/"/g, '&quot;')}"
+                    onchange="saveComment('${img.id}', this.value)"
+                    onclick="event.stopPropagation()">
+                </div>
+              </div>
+            `).join('')}
+            ${g.status === 'generating' || g.status === 'pending' ? `
+              <div style="min-height:200px;border:2px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;">
+                <div class="spinner"></div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `).join('')}
+    ` : `
+      <div class="empty-state" style="padding-top:80px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <h3>Aucune creation</h3>
+        <p>Lancez votre premier batch de generation.</p>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="navigate('generate')">Generer des creas</button>
+      </div>
+    `}
+  `;
+}
+
+// ---- INSPIRATIONS PAGE ----
+function renderInspirations(el) {
+  const inspos = state.inspirations || [];
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1><em>Inspirations</em></h1>
+        <p>Bibliotheque de references creatives (${inspos.length})</p>
+      </div>
+      <button class="btn btn-primary" onclick="uploadInspirations()">
+        + Ajouter des references
+      </button>
+    </div>
+
+    <p style="font-size:14px;color:var(--text-secondary);margin-bottom:24px;">
+      Drop ici des creas concurrentes ou des inspirations. Tu pourras les utiliser comme reference de style quand tu generes.
+    </p>
+
+    ${inspos.length > 0 ? `
+      <div class="image-grid">
+        ${inspos.map(i => `
+          <div class="image-card">
+            <img src="/api/inspiration-image/${i.id}" alt="${i.filename}" loading="lazy">
+            <div class="overlay">
+              <div class="actions" style="flex-wrap:wrap;gap:4px;">
+                <button onclick="event.stopPropagation(); generateFromInspo('${i.id}')" style="background:var(--accent);">✨ Generer dans ce style</button>
+                <button onclick="event.stopPropagation(); deleteInspiration('${i.id}')" style="background:#ef4444;">Supprimer</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    ` : `
+      <div class="empty-state" style="padding-top:60px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        <h3>Aucune inspiration</h3>
+        <p>Ajoutez des creas concurrentes comme references de style.</p>
+        <button class="btn btn-primary" style="margin-top:16px;" onclick="uploadInspirations()">Ajouter des references</button>
+      </div>
+    `}
+  `;
+}
+
+
+// ---- Rating, Iteration, Batch ----
+async function saveComment(imageId, comment) {
+  try {
+    await fetch(`/api/generated-images/${imageId}/comment`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ comment })
+    });
+  } catch(e) { console.error('Failed to save comment:', e); }
+}
+
+async function rateImage(imageId, rating) {
+  try {
+    await fetch(`/api/generated-images/${imageId}/rate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating })
+    });
+    await loadState();
+    renderPage();
+    // Focus the comment input after re-render
+    setTimeout(() => {
+      const commentInput = document.querySelector(`[data-comment-id="${imageId}"]`);
+      if (commentInput) {
+        commentInput.style.borderColor = rating === 'winner' ? '#22c55e' : '#ef4444';
+        commentInput.focus();
+        commentInput.placeholder = rating === 'winner' ? "Pourquoi c'est bien ?" : "Pourquoi c'est pas bien ?";
+      }
+    }, 100);
+  } catch (e) { alert('Erreur: ' + e.message); }
+}
+
+async function iterateImage(imageId, brandId, productId, aspectRatio) {
+  const angle = prompt('Angle pour l\'iteration (ou laisser vide pour varier le style):') || '';
+  const formData = new FormData();
+  formData.append('brand_id', brandId);
+  formData.append('product_id', productId || '');
+  formData.append('num_creations', '2');
+  formData.append('aspect_ratio', aspectRatio || '4:5');
+  formData.append('resolution', '2K');
+  formData.append('marketing_messages', JSON.stringify(angle ? [angle] : []));
+  formData.append('customer_reviews', '[]');
+  formData.append('custom_prompt', '');
+  formData.append('iteration_of', imageId);
+  try {
+    const result = await fetch('/api/generate', { method: 'POST', body: formData });
+    const data = await result.json();
+    if (data.id) {
+      navigate('studio');
+      startPolling();
+      await loadState();
+      renderPage();
+    }
+  } catch (e) { alert('Erreur: ' + e.message); }
+}
+
+async function launchBatchAngles() {
+  const brand = state.currentBrand;
+  if (!brand) return alert('Configurez d\'abord votre marque.');
+  const productId = state.products[0]?.id;
+  if (!productId) return alert('Ajoutez un produit d\'abord.');
+  if (!confirm('Generer 8 creas (1 par angle) ? Cela utilisera 8 credits FAL.')) return;
+
+  const formData = new FormData();
+  formData.append('brand_id', brand.id);
+  formData.append('product_id', productId);
+  formData.append('aspect_ratio', '4:5');
+  formData.append('resolution', '2K');
+  try {
+    const result = await fetch('/api/generate-batch-angles', { method: 'POST', body: formData });
+    const data = await result.json();
+    if (data.gen_ids) {
+      navigate('studio');
+      startPolling();
+      await loadState();
+      renderPage();
+    }
+  } catch (e) { alert('Erreur: ' + e.message); }
+}
+
+// ---- Inspiration Library ----
+async function uploadInspirations() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const formData = new FormData();
+    formData.append('brand_id', state.currentBrand.id);
+    formData.append('label', '');
+    formData.append('source', '');
+    for (const f of input.files) formData.append('images', f);
+    try {
+      await fetch('/api/inspirations', { method: 'POST', body: formData });
+      await loadState();
+      renderPage();
+    } catch (e) { alert('Erreur: ' + e.message); }
+  };
+  input.click();
+}
+
+async function deleteInspiration(id) {
+  await fetch(`/api/inspirations/${id}`, { method: 'DELETE' });
+  await loadState();
+  renderPage();
+}
+
+async function generateFromInspo(inspoId) {
+  const brand = state.currentBrand;
+  const productId = document.querySelector('.product-card.active')?.dataset?.productId || state.products[0]?.id || '';
+  const angle = prompt('Angle marketing pour cette crea:') || '';
+  if (!angle) return;
+
+  const formData = new FormData();
+  formData.append('brand_id', brand.id);
+  formData.append('product_id', productId);
+  formData.append('num_creations', '1');
+  formData.append('aspect_ratio', '4:5');
+  formData.append('resolution', '2K');
+  formData.append('marketing_messages', JSON.stringify([angle]));
+  formData.append('customer_reviews', '[]');
+  formData.append('custom_prompt', '');
+  formData.append('style_ref_id', inspoId);
+  try {
+    const result = await fetch('/api/generate', { method: 'POST', body: formData });
+    const data = await result.json();
+    if (data.id) {
+      navigate('studio');
+      startPolling();
+      await loadState();
+      renderPage();
+    }
+  } catch (e) { alert('Erreur: ' + e.message); }
+}
+
+// ---- Saved Templates ----
+async function saveAsTemplate() {
+  const angle = document.getElementById('angle-input')?.value || '';
+  const prompt = document.getElementById('custom-prompt')?.value || '';
+  const name = window.prompt('Nom du template:', angle || 'Mon template');
+  if (!name) return;
+  try {
+    await fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, angle, prompt_text: prompt })
+    });
+    await loadState();
+    renderPage();
+  } catch (e) { alert('Erreur: ' + e.message); }
+}
+
+async function loadTemplate(tpl) {
+  const angleInput = document.getElementById('angle-input');
+  const promptInput = document.getElementById('custom-prompt');
+  if (angleInput && tpl.angle) angleInput.value = tpl.angle;
+  if (promptInput && tpl.prompt_text) promptInput.value = tpl.prompt_text;
+}
+
+async function deleteTemplate(id) {
+  await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+  await loadState();
+  renderPage();
+}
+
+
+// ---- SETTINGS PAGE ----
+function renderSettings(el) {
+  const brand = state.currentBrand;
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1><em>Parametres</em></h1>
+        <p>Gerez votre compte et vos preferences MNG Créa.</p>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <div class="settings-card" style="grid-column:span 2;">
+        <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+          <div style="width:56px;height:56px;border-radius:14px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#111;">
+            ${brand ? brand.name.charAt(0).toUpperCase() : 'C'}
+          </div>
+          <div>
+            <h3>${brand?.name || 'MNG Créa'}</h3>
+            <p>${brand?.url || 'Aucune marque configuree'}</p>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <span style="background:rgba(34,197,94,0.1);color:#22c55e;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">Compte Actif</span>
+          <span style="background:var(--accent-bg);color:var(--accent);padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;">Plan Local</span>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <h3>FAL API</h3>
+        <p style="margin-bottom:12px;">Cle API pour la generation d'images</p>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="dot ${state.falConfigured ? 'ok' : 'err'}" style="width:10px;height:10px;border-radius:50%;display:inline-block;"></span>
+          <span style="font-size:13px;">${state.falConfigured ? 'Connectee' : 'Non configuree'}</span>
+        </div>
+        ${!state.falConfigured ? `
+          <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+            Lancez: <code style="background:var(--bg-main);padding:2px 6px;border-radius:4px;">FAL_KEY=xxx python server.py</code>
+          </p>
+        ` : ''}
+      </div>
+
+      <div class="settings-card">
+        <h3>Stockage</h3>
+        <p>Images generees et packshots</p>
+        <div style="margin-top:12px;font-size:13px;color:var(--text-secondary);">
+          ${state.stats.total_images || 0} images &middot; ${state.stats.products || 0} produits
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ---- Modals ----
+function showBrandModal() {
+  const brand = state.currentBrand;
+  const modal = document.getElementById('modal-content');
+  modal.innerHTML = `
+    <h2>${brand ? 'Editer la marque' : 'Nouvelle marque'}</h2>
+    <form onsubmit="saveBrand(event)">
+      <div class="form-group">
+        <label>Nom de la marque</label>
+        <input type="text" id="brand-name" value="${brand?.name || ''}" required>
+      </div>
+      <div class="form-group">
+        <label>Site web</label>
+        <input type="text" id="brand-url" value="${brand?.url || ''}" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="brand-desc" rows="3">${brand?.description || ''}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Brand DNA / Directives creatives</label>
+        <textarea id="brand-dna" rows="6" placeholder="Couleurs, typographie, ton, style photo...">${brand?.brand_dna || ''}</textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Sauvegarder</button>
+      </div>
+    </form>
+  `;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+async function saveBrand(e) {
+  e.preventDefault();
+  const formData = new FormData();
+  formData.append('name', document.getElementById('brand-name').value);
+  formData.append('url', document.getElementById('brand-url').value);
+  formData.append('description', document.getElementById('brand-desc').value);
+  formData.append('brand_dna', document.getElementById('brand-dna').value);
+
+  try {
+    if (state.currentBrand) {
+      await fetch(`/api/brands/${state.currentBrand.id}`, { method: 'PUT', body: formData });
+    } else {
+      await fetch('/api/brands', { method: 'POST', body: formData });
+    }
+    closeModal();
+    await loadState();
+    renderPage();
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+function showProductModal() {
+  const modal = document.getElementById('modal-content');
+  modal.innerHTML = `
+    <h2>Nouveau produit</h2>
+    <form onsubmit="saveProduct(event)">
+      <div class="form-group">
+        <label>Nom du produit</label>
+        <input type="text" id="product-name" required placeholder="Ex: Brainstoorm Super Cafe">
+      </div>
+      <div class="form-group">
+        <label>Photos produit (packshots)</label>
+        <div class="file-drop" onclick="document.getElementById('product-files').click()" id="product-drop">
+          <input type="file" id="product-files" multiple accept="image/*" onchange="handleFileSelect(this)">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p style="margin-top:8px;font-size:13px;color:var(--text-muted);">Cliquez ou glissez vos images ici</p>
+          <p id="file-count" style="font-size:12px;color:var(--accent);margin-top:4px;"></p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button type="submit" class="btn btn-primary">Ajouter</button>
+      </div>
+    </form>
+  `;
+
+  // Setup drag and drop
+  const drop = document.getElementById('product-drop');
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+  drop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.classList.remove('dragover');
+    document.getElementById('product-files').files = e.dataTransfer.files;
+    handleFileSelect(document.getElementById('product-files'));
+  });
+
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function handleFileSelect(input) {
+  const count = input.files.length;
+  document.getElementById('file-count').textContent = count > 0 ? `${count} fichier(s) selectionne(s)` : '';
+}
+
+async function saveProduct(e) {
+  e.preventDefault();
+  if (!state.currentBrand) return alert('Creez d\'abord une marque.');
+
+  const formData = new FormData();
+  formData.append('name', document.getElementById('product-name').value);
+  const files = document.getElementById('product-files').files;
+  for (const file of files) {
+    formData.append('images', file);
+  }
+
+  try {
+    await fetch(`/api/brands/${state.currentBrand.id}/products`, { method: 'POST', body: formData });
+    closeModal();
+    // Reload products
+    state.products = await api(`/api/brands/${state.currentBrand.id}/products`);
+    await loadState();
+    renderPage();
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+async function addImagesToProduct(productId) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  input.accept = 'image/*';
+  input.onchange = async () => {
+    const formData = new FormData();
+    for (const file of input.files) {
+      formData.append('images', file);
+    }
+    try {
+      await fetch(`/api/products/${productId}/images`, { method: 'POST', body: formData });
+      state.products = await api(`/api/brands/${state.currentBrand.id}/products`);
+      await loadState();
+      renderPage();
+    } catch (e) {
+      alert('Erreur: ' + e.message);
+    }
+  };
+  input.click();
+}
+
+// ---- Actions ----
+function openLightbox(src) {
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+async function downloadImage(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function downloadAllImages() {
+  const allImages = state.generations.flatMap(g => g.images);
+  for (const img of allImages) {
+    await downloadImage(`/api/image/${img.id}`, img.filename);
+    await new Promise(r => setTimeout(r, 200));
+  }
+}
+
+async function deleteGenImage(imageId) {
+  if (!confirm('Supprimer cette image ?')) return;
+  await api(`/api/generated-images/${imageId}`, { method: 'DELETE' });
+  await loadState();
+  renderPage();
+}
+
+async function deleteGeneration(genId) {
+  if (!confirm('Supprimer cette generation et toutes ses images ?')) return;
+  await api(`/api/generations/${genId}`, { method: 'DELETE' });
+  await loadState();
+  renderPage();
+}
+
+// ---- Polling ----
+function startPolling() {
+  if (genPollInterval) return;
+  genPollInterval = setInterval(async () => {
+    const gens = await api('/api/generations');
+    const active = gens.filter(g => g.status === 'pending' || g.status === 'generating');
+    const changed = JSON.stringify(gens.map(g => g.images.length)) !== JSON.stringify(state.generations.map(g => g.images.length));
+    state.generations = gens;
+    if (changed) renderPage();
+    if (active.length === 0) {
+      clearInterval(genPollInterval);
+      genPollInterval = null;
+      await loadState();
+      renderPage();
+    }
+  }, 3000);
+}
+
+// ---- Strategy & Competitors ----
+function addSuggestedTag(containerId, value) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  // Check if tag already exists
+  const existing = getTags(containerId);
+  if (existing.includes(value)) return;
+  const input = container.querySelector('input');
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.innerHTML = `${value} <button onclick="this.parentElement.remove()">&times;</button>`;
+  container.insertBefore(tag, input);
+}
+
+function toggleCompetitorForm() {
+  const wrapper = document.getElementById('competitor-form-wrapper');
+  if (wrapper) wrapper.style.display = wrapper.style.display === 'none' ? 'block' : 'none';
+}
+
+function prefillCompetitor(name, url, type) {
+  const nameEl = document.getElementById('comp-name');
+  const urlEl = document.getElementById('comp-url');
+  const typeEl = document.getElementById('comp-type');
+  if (nameEl) nameEl.value = name;
+  if (urlEl) urlEl.value = url;
+  if (typeEl) typeEl.value = type;
+}
+
+async function saveStrategy() {
+  const brand = state.currentBrand;
+  if (!brand) return alert('Configurez d\'abord votre marque.');
+
+  const data = {
+    avatar_description: document.getElementById('strat-avatar')?.value || '',
+    avatar_pain_points: getTags('strat-pains'),
+    avatar_desires: getTags('strat-desires'),
+    usp: document.getElementById('strat-usp')?.value || '',
+    offers: getTags('strat-offers'),
+    tone_of_voice: document.getElementById('strat-tone')?.value || '',
+  };
+
+  try {
+    await fetch(`/api/brands/${brand.id}/strategy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    state.strategy = data;
+    // Brief visual feedback
+    const btn = document.querySelector('.strategy-section .btn-primary.btn-lg');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Sauvegarde !';
+      btn.style.background = '#22c55e';
+      setTimeout(() => { btn.textContent = orig; btn.style.background = ''; }, 1500);
+    }
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+async function addCompetitor() {
+  const brand = state.currentBrand;
+  if (!brand) return;
+  const name = document.getElementById('comp-name')?.value?.trim();
+  const url = document.getElementById('comp-url')?.value?.trim();
+  const type = document.getElementById('comp-type')?.value || 'direct';
+  if (!name) return alert('Le nom est requis.');
+
+  try {
+    await fetch(`/api/brands/${brand.id}/competitors`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url, type }),
+    });
+    await loadState();
+    renderPage();
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+async function deleteCompetitor(id) {
+  if (!confirm('Supprimer ce concurrent ?')) return;
+  try {
+    await fetch(`/api/competitors/${id}`, { method: 'DELETE' });
+    await loadState();
+    renderPage();
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+async function suggestAngles() {
+  const brand = state.currentBrand;
+  if (!brand) return alert('Configurez d\'abord votre marque.');
+
+  const btn = document.getElementById('suggest-angles-btn');
+  const container = document.getElementById('angle-cards-container');
+  if (!btn || !container) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;"></div> Analyse en cours...';
+  container.innerHTML = '';
+
+  try {
+    const suggestions = await api(`/api/brands/${brand.id}/generate-strategy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    const angles = suggestions.suggested_angles || suggestions.angles || suggestions || [];
+    if (angles.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);font-size:13px;margin-top:12px;">Aucune suggestion. Remplissez la strategie dans "Ma marque".</p>';
+    } else {
+      const funnelLabel = (raw) => {
+        const map = {
+          'PROBLEM_AWARE': 'Probleme',
+          'SOLUTION_AWARE': 'Solution',
+          'PRODUCT_AWARE': 'Produit',
+          'MOST_AWARE': 'Convaincu',
+          'UNAWARE': 'Inconscient',
+          'TOFU': 'TOFU',
+          'MOFU': 'MOFU',
+          'BOFU': 'BOFU',
+        };
+        const key = (raw || '').toUpperCase().replace(/ /g, '_');
+        return map[key] || raw || 'TOFU';
+      };
+      const funnelClass = (raw) => {
+        const key = (raw || '').toLowerCase().replace(/ /g, '_');
+        if (['problem_aware', 'tofu', 'unaware'].includes(key)) return 'tofu';
+        if (['solution_aware', 'mofu'].includes(key)) return 'mofu';
+        if (['product_aware', 'bofu', 'most_aware'].includes(key)) return 'bofu';
+        return key;
+      };
+      container.innerHTML = `
+        <div class="angle-cards">
+          ${angles.map(a => {
+            const rawFunnel = a.funnel_stage || a.funnel || 'tofu';
+            return `
+            <div class="angle-card" onclick="selectSuggestedAngle(this, '${(a.angle || a.text || '').replace(/'/g, "\\'")}')">
+              <span class="angle-funnel ${funnelClass(rawFunnel)}">${funnelLabel(rawFunnel)}</span>
+              <div class="angle-text">${a.angle || a.text || ''}</div>
+              ${a.headline ? `<div class="angle-headline">"${a.headline}"</div>` : ''}
+              ${a.rationale ? `<div class="angle-rationale" title="${(a.rationale || '').replace(/"/g, '&quot;')}">${a.rationale}</div>` : ''}
+            </div>
+          `}).join('')}
+        </div>
+      `;
+    }
+  } catch (e) {
+    container.innerHTML = `<p style="color:#ef4444;font-size:13px;margin-top:12px;">Erreur: ${e.message}</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Suggerer des angles';
+  }
+}
+
+function selectSuggestedAngle(card, angleText) {
+  const input = document.getElementById('angle-input');
+  if (input) input.value = angleText;
+  // Visual feedback on card
+  document.querySelectorAll('.angle-card').forEach(c => { c.classList.remove('selected'); c.style.borderColor = ''; });
+  card.classList.add('selected');
+  // Also set funnel pill if angle has funnel info
+  const funnelBadge = card.querySelector('.angle-funnel');
+  if (funnelBadge) {
+    const funnel = funnelBadge.textContent.trim().toUpperCase();
+    const pill = document.querySelector(`#funnel-pills .pill[data-value="${funnel}"]`);
+    if (pill) selectPill(pill, 'funnel-pills');
+  }
+  // Scroll to angle input
+  input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ---- Keyboard shortcuts ----
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeLightbox();
+    closeModal();
+  }
+});
+
+// ---- Init ----
+async function init() {
+  await loadState();
+  // Sync sidebar active state with currentPage from hash
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.page === currentPage);
+  });
+  renderPage();
+}
+
+// Handle hash changes (back/forward browser buttons)
+window.addEventListener('hashchange', () => {
+  const page = location.hash.slice(1) || 'home';
+  if (page !== currentPage) navigate(page);
+});
+
+init();
+</script>
+</body>
+</html>
