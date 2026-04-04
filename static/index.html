@@ -848,6 +848,7 @@ body {
 }
 .comp-badge.direct { background: rgba(239,68,68,0.1); color: #ef4444; }
 .comp-badge.indirect { background: rgba(234,179,8,0.1); color: #ca8a04; }
+.comp-badge.market { background: rgba(59,130,246,0.1); color: #3b82f6; }
 .competitor-row .comp-delete {
   margin-left: auto;
   background: none;
@@ -1215,6 +1216,9 @@ let state = {
   strategy: null,
   competitors: [],
   selectedProductId: '',
+  batchLanguage: 'fr',
+  selectedFormats: ['4:5'],
+  studioFilter: null,
 };
 
 // Polling for active generations
@@ -1437,6 +1441,10 @@ function renderBrand(el) {
                   `).join('')}
                   ${(p.images || []).length === 0 ? '<span style="color:var(--text-muted);font-size:13px;">Aucune image</span>' : ''}
                 </div>
+                <div style="margin-top:10px;">
+                  <input type="text" placeholder="URL page produit..." value="${p.page_url||''}" onchange="updateProduct('${p.id}', {page_url: this.value})" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-sans);background:var(--bg-main);margin-bottom:6px;">
+                  <textarea placeholder="Brief produit..." onchange="updateProduct('${p.id}', {brief: this.value})" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-family:var(--font-sans);background:var(--bg-main);min-height:50px;resize:vertical;">${p.brief||''}</textarea>
+                </div>
                 <div style="margin-top:8px;display:flex;gap:8px;">
                   <button class="btn btn-ghost" onclick="addImagesToProduct('${p.id}')">+ Images</button>
                   <span style="font-size:12px;color:var(--text-muted);line-height:32px;">${(p.images || []).length} photo(s)</span>
@@ -1523,6 +1531,7 @@ function renderBrand(el) {
                   ${c.url ? `<div class="comp-url">${c.url}</div>` : ''}
                 </div>
                 <span class="comp-badge ${c.type || 'direct'}">${c.type || 'direct'}</span>
+                ${c.market ? `<span class="comp-badge market">${c.market}</span>` : ''}
                 <button class="comp-delete" onclick="deleteCompetitor('${c.id}')" title="Supprimer">&times;</button>
               </div>
             `).join('')}
@@ -1543,6 +1552,14 @@ function renderBrand(el) {
                 <select id="comp-type">
                   <option value="direct">Direct</option>
                   <option value="indirect">Indirect</option>
+                </select>
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label>Marche</label>
+                <select id="comp-market">
+                  <option value="EU">EU</option>
+                  <option value="Non-EU">Non-EU</option>
+                  <option value="Worldwide">Worldwide</option>
                 </select>
               </div>
               <button class="btn btn-primary" onclick="addCompetitor()" style="padding:8px 16px;font-size:12px;align-self:flex-end;">Ajouter</button>
@@ -1600,23 +1617,31 @@ function renderGenerate(el) {
     ` : ''}
 
     <div class="gen-form">
+      <div class="card" style="margin-bottom:16px;padding:16px 24px;">
+        <div class="card-title" style="margin-bottom:8px;">LANGUE DU BATCH</div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="pill ${state.batchLanguage !== 'en' ? 'active' : ''}" onclick="state.batchLanguage='fr';renderPage()">FR Francais</button>
+          <button class="pill ${state.batchLanguage === 'en' ? 'active' : ''}" onclick="state.batchLanguage='en';renderPage()">EN English</button>
+        </div>
+      </div>
+
       <div class="form-section">
         <div class="form-section-title">Configuration Generale</div>
         <div class="form-row">
           <div class="form-group">
             <label>Nombre de creations</label>
             <div class="slider-container">
-              <input type="range" id="gen-count" min="1" max="20" value="4" oninput="document.getElementById('gen-count-val').textContent=this.value">
-              <div class="slider-value" id="gen-count-val">4</div>
+              <input type="range" id="gen-count" min="1" max="20" value="${state.genCount || 4}" oninput="state.genCount=parseInt(this.value);document.getElementById('gen-count-val').textContent=this.value;updateSummary()">
+              <div class="slider-value" id="gen-count-val">${state.genCount || 4}</div>
             </div>
           </div>
           <div class="form-group">
-            <label>Format d'export</label>
+            <label>Format d'export <span style="font-size:10px;color:var(--text-muted);font-weight:400;">(multi-select)</span></label>
             <div class="pill-group" id="format-pills">
-              <button class="pill" onclick="selectPill(this, 'format-pills')" data-value="1:1">1:1</button>
-              <button class="pill active" onclick="selectPill(this, 'format-pills')" data-value="4:5">4:5</button>
-              <button class="pill" onclick="selectPill(this, 'format-pills')" data-value="9:16">9:16</button>
-              <button class="pill" onclick="selectPill(this, 'format-pills')" data-value="16:9">16:9</button>
+              <button class="pill ${state.selectedFormats.includes('1:1') ? 'active' : ''}" onclick="toggleFormat('1:1')" data-value="1:1">1:1</button>
+              <button class="pill ${state.selectedFormats.includes('4:5') ? 'active' : ''}" onclick="toggleFormat('4:5')" data-value="4:5">4:5</button>
+              <button class="pill ${state.selectedFormats.includes('9:16') ? 'active' : ''}" onclick="toggleFormat('9:16')" data-value="9:16">9:16</button>
+              <button class="pill ${state.selectedFormats.includes('16:9') ? 'active' : ''}" onclick="toggleFormat('16:9')" data-value="16:9">16:9</button>
             </div>
           </div>
           <div class="form-group">
@@ -1663,6 +1688,11 @@ function renderGenerate(el) {
           <button class="pill" onclick="setAngle(this)" data-value="sommeil de mauvaise qualite">Sommeil</button>
           <button class="pill" onclick="setAngle(this)" data-value="ingredients 100% naturels, zero cochonnerie">Clean label</button>
         </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;">
+          ${['Mettre en avant le -20%','Lancement de produit','Alternative au cafe','Anti-ballonnements','Energie sans crash','Focus & concentration'].map(s =>
+            `<button class="pill" onclick="document.getElementById('angle-input').value='${s}'" style="font-size:11px;padding:4px 10px;cursor:pointer;background:var(--accent-secondary-bg);color:#8a8520;border-color:rgba(249,247,132,0.3);">${s}</button>`
+          ).join('')}
+        </div>
       </div>
 
       <!-- Funnel Stage -->
@@ -1698,14 +1728,14 @@ function renderGenerate(el) {
              ondragleave="this.style.borderColor='var(--border)';this.style.background=''"
              ondrop="handleQuickDrop(event)">
           <div id="quick-upload-preview" style="display:none;margin-bottom:8px;">
-            <img id="quick-upload-img" style="max-height:120px;border-radius:8px;object-fit:cover;">
+            <div id="quick-upload-thumbs" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;"></div>
             <button onclick="event.stopPropagation();clearQuickUpload()" style="display:block;margin:8px auto 0;background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;">✕ Retirer</button>
           </div>
           <div id="quick-upload-placeholder">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             <p style="font-size:13px;color:var(--text-muted);margin:0;">Glisse une crea concurrent ici ou clique pour uploader</p>
           </div>
-          <input type="file" id="quick-upload-input" accept="image/*" style="display:none;" onchange="handleQuickUpload(this)">
+          <input type="file" id="quick-upload-input" accept="image/*" multiple style="display:none;" onchange="handleQuickUpload(this)">
         </div>
 
         <!-- Library selector -->
@@ -1761,7 +1791,10 @@ function renderGenerate(el) {
     <div class="gen-bottom-bar">
       <div style="display:flex;align-items:center;gap:12px;">
         <div class="gen-summary">
-          <strong id="summary-count">4</strong> Creas &middot; <strong id="summary-format">4:5</strong> &middot; <strong id="summary-res">2K</strong>
+          <strong id="summary-count">${state.genCount || 4}</strong> Creas &middot; <strong id="summary-format">${state.selectedFormats.join(', ')}</strong> &middot; <strong id="summary-res">2K</strong>
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">
+            ~&euro;${((state.genCount || 4) * state.selectedFormats.length * 0.04).toFixed(2)} estime
+          </span>
         </div>
         <button class="btn btn-ghost" onclick="saveAsTemplate()" style="font-size:11px;padding:4px 10px;">Sauver template</button>
         <button class="btn btn-secondary" onclick="launchBatchAngles()" style="font-size:12px;padding:7px 14px;" ${!state.falConfigured ? 'disabled style="opacity:0.5"' : ''}>
@@ -1786,14 +1819,46 @@ function renderGenerate(el) {
 
 function updateSummary() {
   const count = document.getElementById('gen-count')?.value || '4';
-  const format = document.querySelector('#format-pills .pill.active')?.dataset.value || '4:5';
+  state.genCount = parseInt(count);
   const res = document.querySelector('#resolution-pills .pill.active')?.dataset.value || '2K';
   const sc = document.getElementById('summary-count');
   const sf = document.getElementById('summary-format');
   const sr = document.getElementById('summary-res');
   if (sc) sc.textContent = count;
-  if (sf) sf.textContent = format;
+  if (sf) sf.textContent = state.selectedFormats.join(', ');
   if (sr) sr.textContent = res;
+}
+
+function toggleFormat(fmt) {
+  const idx = state.selectedFormats.indexOf(fmt);
+  if (idx > -1 && state.selectedFormats.length > 1) {
+    state.selectedFormats.splice(idx, 1);
+  } else if (idx === -1) {
+    state.selectedFormats.push(fmt);
+  }
+  renderPage();
+}
+
+async function updateProduct(productId, data) {
+  await api(`/api/products/${productId}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+}
+
+async function regenerateImage(imageId) {
+  try {
+    const res = await api(`/api/generated-images/${imageId}/regenerate`, {method:'POST'});
+    if (res.generation_id) {
+      alert('Regeneration lancee !');
+      startPolling();
+      await loadState();
+      navigate('studio');
+    }
+  } catch(e) {
+    alert('Erreur: ' + e.message);
+  }
 }
 
 function selectPill(el, groupId) {
@@ -1847,12 +1912,12 @@ function selectInspo(el, inspoId) {
 }
 
 // Quick upload of competitor creative directly in Generation page
-let quickUploadFile = null;
+let quickUploadFiles = [];
 
 function handleQuickUpload(input) {
-  if (input.files && input.files[0]) {
-    quickUploadFile = input.files[0];
-    showQuickPreview(quickUploadFile);
+  if (input.files && input.files.length > 0) {
+    quickUploadFiles = Array.from(input.files);
+    showQuickPreviews(quickUploadFiles);
   }
 }
 
@@ -1861,26 +1926,34 @@ function handleQuickDrop(event) {
   const zone = document.getElementById('quick-upload-zone');
   zone.style.borderColor = 'var(--border)';
   zone.style.background = '';
-  if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-    quickUploadFile = event.dataTransfer.files[0];
-    showQuickPreview(quickUploadFile);
+  if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+    quickUploadFiles = Array.from(event.dataTransfer.files);
+    showQuickPreviews(quickUploadFiles);
   }
 }
 
-function showQuickPreview(file) {
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    document.getElementById('quick-upload-img').src = e.target.result;
-    document.getElementById('quick-upload-preview').style.display = 'block';
-    document.getElementById('quick-upload-placeholder').style.display = 'none';
-  };
-  reader.readAsDataURL(file);
+function showQuickPreviews(files) {
+  const thumbsContainer = document.getElementById('quick-upload-thumbs');
+  if (!thumbsContainer) return;
+  thumbsContainer.innerHTML = '';
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'max-height:80px;border-radius:8px;object-fit:cover;';
+      thumbsContainer.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('quick-upload-preview').style.display = 'block';
+  document.getElementById('quick-upload-placeholder').style.display = 'none';
   // Clear library selection
   document.querySelectorAll('#inspo-selector .product-card').forEach(c => c.classList.remove('active'));
 }
 
 function clearQuickUpload() {
-  quickUploadFile = null;
+  quickUploadFiles = [];
   const preview = document.getElementById('quick-upload-preview');
   const placeholder = document.getElementById('quick-upload-placeholder');
   if (preview) preview.style.display = 'none';
@@ -1895,24 +1968,25 @@ async function launchGeneration() {
 
   const productId = document.querySelector('.product-card.active')?.dataset?.productId || '';
   const count = document.getElementById('gen-count')?.value || 4;
-  const format = document.querySelector('#format-pills .pill.active')?.dataset.value || '4:5';
+  const formats = state.selectedFormats || ['4:5'];
   const resolution = document.querySelector('#resolution-pills .pill.active')?.dataset.value || '2K';
   const angle = document.getElementById('angle-input')?.value || '';
   const customPrompt = document.getElementById('custom-prompt')?.value || '';
   let styleRefId = document.querySelector('#inspo-selector .product-card.active')?.dataset?.inspoId || '';
   const funnelStage = document.querySelector('#funnel-pills .pill.active')?.dataset.value || '';
+  const language = state.batchLanguage || 'fr';
 
   if (!angle && !customPrompt) return alert('Ecris un angle marketing ou un prompt personnalise.');
   if (!productId) return alert('Selectionne un produit.');
 
-  // If quick upload file exists, upload it as inspiration first
-  if (quickUploadFile && !styleRefId) {
+  // If quick upload files exist, upload the first as inspiration
+  if (quickUploadFiles.length > 0 && !styleRefId) {
     try {
       const uploadForm = new FormData();
       uploadForm.append('brand_id', brand.id);
       uploadForm.append('label', 'Quick ref - ' + (angle || 'generation'));
       uploadForm.append('source', 'quick-upload');
-      uploadForm.append('images', quickUploadFile);
+      for (const f of quickUploadFiles) uploadForm.append('images', f);
       const uploadResult = await fetch('/api/inspirations', { method: 'POST', body: uploadForm });
       const uploaded = await uploadResult.json();
       if (uploaded && uploaded[0]) styleRefId = uploaded[0].id;
@@ -1926,12 +2000,14 @@ async function launchGeneration() {
   formData.append('brand_id', brand.id);
   formData.append('product_id', productId);
   formData.append('num_creations', count);
-  formData.append('aspect_ratio', format);
+  formData.append('aspect_ratio', formats[0]);
   formData.append('resolution', resolution);
   formData.append('marketing_messages', JSON.stringify(angleWithFunnel ? [angleWithFunnel] : []));
   formData.append('customer_reviews', JSON.stringify([]));
   formData.append('custom_prompt', customPrompt);
   formData.append('style_ref_id', styleRefId);
+  formData.append('language', language);
+  formData.append('formats', JSON.stringify(formats));
 
   try {
     const result = await fetch('/api/generate', { method: 'POST', body: formData });
@@ -1955,6 +2031,15 @@ function renderStudio(el) {
   const activeGens = gens.filter(g => g.status === 'pending' || g.status === 'generating');
 
   if (activeGens.length > 0) startPolling();
+
+  // Filter images per batch based on studioFilter
+  const filterImages = (images) => {
+    if (!state.studioFilter) return images;
+    if (state.studioFilter === 'winner') return images.filter(img => img.rating === 'winner');
+    if (state.studioFilter === 'kill') return images.filter(img => img.rating === 'kill');
+    if (state.studioFilter === 'unrated') return images.filter(img => !img.rating);
+    return images;
+  };
 
   el.innerHTML = `
     <div class="page-header">
@@ -1983,6 +2068,13 @@ function renderStudio(el) {
       </div>
     ` : ''}
 
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <button class="pill ${!state.studioFilter ? 'active' : ''}" onclick="state.studioFilter=null;renderPage()">Tous</button>
+      <button class="pill ${state.studioFilter==='winner' ? 'active' : ''}" onclick="state.studioFilter='winner';renderPage()">Winners</button>
+      <button class="pill ${state.studioFilter==='kill' ? 'active' : ''}" onclick="state.studioFilter='kill';renderPage()">Kills</button>
+      <button class="pill ${state.studioFilter==='unrated' ? 'active' : ''}" onclick="state.studioFilter='unrated';renderPage()">Non notes</button>
+    </div>
+
     ${gens.length > 0 ? `
       ${gens.map(g => `
         <div style="margin-bottom:28px;">
@@ -1998,7 +2090,7 @@ function renderStudio(el) {
             <button class="btn btn-ghost btn-danger" onclick="deleteGeneration('${g.id}')" style="font-size:11px;padding:4px 10px;">Supprimer</button>
           </div>
           <div class="studio-grid">
-            ${g.images.map(img => `
+            ${filterImages(g.images).map(img => `
               <div class="studio-card-wrapper ${img.rating === 'winner' ? 'winner-card' : ''}${img.rating === 'kill' ? 'kill-card' : ''}">
                 <div class="image-card" onclick="openLightbox('/api/image/${img.id}')" style="position:relative;">
                   <img src="/api/image/${img.id}" alt="${img.filename}" loading="lazy">
@@ -2010,6 +2102,7 @@ function renderStudio(el) {
                       <button onclick="event.stopPropagation(); rateImage('${img.id}', 'winner')" style="background:rgba(34,197,94,0.85);">Winner</button>
                       <button onclick="event.stopPropagation(); rateImage('${img.id}', 'kill')" style="background:rgba(239,68,68,0.85);">Kill</button>
                       <button onclick="event.stopPropagation(); iterateImage('${img.id}', '${g.brand_id}', '${g.product_id}', '${g.aspect_ratio}')">Iterer</button>
+                      <button onclick="event.stopPropagation(); regenerateImage('${img.id}')">Regenerer</button>
                       <button onclick="event.stopPropagation(); downloadImage('/api/image/${img.id}', '${img.filename}')">DL</button>
                     </div>
                   </div>
@@ -2581,13 +2674,14 @@ async function addCompetitor() {
   const name = document.getElementById('comp-name')?.value?.trim();
   const url = document.getElementById('comp-url')?.value?.trim();
   const type = document.getElementById('comp-type')?.value || 'direct';
+  const market = document.getElementById('comp-market')?.value || 'EU';
   if (!name) return alert('Le nom est requis.');
 
   try {
     await fetch(`/api/brands/${brand.id}/competitors`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, url, type }),
+      body: JSON.stringify({ name, url, type, market }),
     });
     await loadState();
     renderPage();

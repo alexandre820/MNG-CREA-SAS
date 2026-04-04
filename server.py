@@ -147,6 +147,12 @@ def init_db():
         "ALTER TABLE generated_images ADD COLUMN comment TEXT DEFAULT ''",
         "ALTER TABLE generations ADD COLUMN iteration_of TEXT DEFAULT NULL",
         "ALTER TABLE generations ADD COLUMN style_ref_id TEXT DEFAULT NULL",
+        # New columns
+        "ALTER TABLE products ADD COLUMN page_url TEXT DEFAULT ''",
+        "ALTER TABLE products ADD COLUMN brief TEXT DEFAULT ''",
+        "ALTER TABLE competitors ADD COLUMN market TEXT DEFAULT 'EU'",
+        "ALTER TABLE generations ADD COLUMN language TEXT DEFAULT 'fr'",
+        "ALTER TABLE generations ADD COLUMN formats TEXT DEFAULT '[\"4:5\"]'",
     ]:
         try:
             conn.execute(stmt)
@@ -336,8 +342,14 @@ def build_prompt(brand_dna: str, product_name: str, aspect_ratio: str,
                  custom_prompt: str, is_iteration: bool = False,
                  has_style_ref: bool = False,
                  strategy_context: str = "",
-                 feedback_context: str = "") -> str:
+                 feedback_context: str = "",
+                 language: str = "fr") -> str:
     """Build a generation prompt from brand DNA + product + marketing context."""
+
+    def _apply_language(prompt: str) -> str:
+        if language and language != "fr":
+            return f"IMPORTANT: All text overlays and headlines must be in English.\n\n{prompt}"
+        return prompt
 
     # Determine the angle
     angle_text = ""
@@ -357,7 +369,7 @@ def build_prompt(brand_dna: str, product_name: str, aspect_ratio: str,
             "Keep the same angle but change from lifestyle to product-hero focus (or vice versa).",
             "Same message, different visual metaphor. Find a new way to illustrate the concept.",
         ])
-        return f"""Create a VARIATION of the reference ad creative. This is an iteration — keep the brand and product consistent but create something fresh.
+        return _apply_language(f"""Create a VARIATION of the reference ad creative. This is an iteration — keep the brand and product consistent but create something fresh.
 
 ITERATION RULE: {variation_type}
 
@@ -369,12 +381,12 @@ The product MUST be "{product_name}" by Mush n Go — use the exact product pack
 Style: Professional advertising photography for Meta/Instagram. {aspect_ratio} format.
 {brand_dna[:300]}
 {strategy_context}
-{feedback_context}"""
+{feedback_context}""")
 
     # STYLE REFERENCE MODE: match the style of an inspiration image
     if has_style_ref:
         headline = generate_headline(angle_text) if angle_text else random.choice(ANGLE_HEADLINES["default"])
-        return f"""Create a static ad creative for Meta/Instagram, matching the STYLE and COMPOSITION of the reference inspiration image.
+        return _apply_language(f"""Create a static ad creative for Meta/Instagram, matching the STYLE and COMPOSITION of the reference inspiration image.
 
 Copy the visual style (lighting, composition, color grading, layout) from the reference image but adapt it for:
 - Product: {product_name} by Mush n Go (use the product packshot from the reference images)
@@ -385,11 +397,11 @@ The product MUST be "{product_name}" by Mush n Go — use the exact product pack
 {aspect_ratio} format. Professional quality.
 {brand_dna[:300]}
 {strategy_context}
-{feedback_context}"""
+{feedback_context}""")
 
     # If user gave a full custom prompt, use it directly with brand context
     if custom_prompt and not marketing_messages:
-        return f"""Static advertisement for Meta/Instagram. {aspect_ratio} format.
+        return _apply_language(f"""Static advertisement for Meta/Instagram. {aspect_ratio} format.
 
 {custom_prompt}
 
@@ -399,7 +411,7 @@ Product: {product_name}.
 Style: Professional advertising photography, warm directional lighting, editorial quality. Purple (#7643DE) accent color.
 {brand_dna[:400]}
 {strategy_context}
-{feedback_context}"""
+{feedback_context}""")
 
     # STANDARD MODE: generate from angle
     headline = generate_headline(angle_text) if angle_text else random.choice(ANGLE_HEADLINES["default"])
@@ -410,7 +422,7 @@ Style: Professional advertising photography, warm directional lighting, editoria
     composition = composition.replace("{product}", product_name)
     composition = composition.replace("{headline}", headline)
 
-    return f"""Static advertisement for Meta/Instagram. {aspect_ratio} vertical format.
+    return _apply_language(f"""Static advertisement for Meta/Instagram. {aspect_ratio} vertical format.
 
 {composition}
 
@@ -420,7 +432,15 @@ Style: Professional advertising photography, warm directional lighting, editoria
 Color accents: purple (#7643DE), warm amber, dark backgrounds.
 {brand_dna[:300]}
 {strategy_context}
-{feedback_context}"""
+{feedback_context}""")
+
+
+FORMAT_TO_RESOLUTION = {
+    "1:1": "1024x1024",
+    "4:5": "1024x1280",
+    "9:16": "1024x1792",
+    "16:9": "1792x1024",
+}
 
 
 def run_generation(generation_id: str):
@@ -502,6 +522,16 @@ TONE: {strategy['tone_of_voice']}"""
             if feedback_lines:
                 feedback_context = "CREATIVE FEEDBACK FROM USER (learn from this):\n" + "\n".join(feedback_lines[:15])
 
+            # Parse formats for multi-format generation
+            try:
+                gen_formats = json.loads(gen.get("formats", '["4:5"]'))
+            except (json.JSONDecodeError, TypeError):
+                gen_formats = [gen["aspect_ratio"]]
+            if not gen_formats:
+                gen_formats = [gen["aspect_ratio"]]
+
+            gen_language = gen.get("language", "fr") or "fr"
+
             prompt = build_prompt(
                 brand_dna=brand_dna,
                 product_name=product_name,
@@ -513,15 +543,8 @@ TONE: {strategy['tone_of_voice']}"""
                 has_style_ref=has_style_ref,
                 strategy_context=strategy_context,
                 feedback_context=feedback_context,
+                language=gen_language,
             )
-
-            payload = {
-                "prompt": prompt,
-                "aspect_ratio": gen["aspect_ratio"],
-                "num_images": batch_size,
-                "output_format": "png",
-                "resolution": gen["resolution"],
-            }
 
             # Collect reference images: product packshots + style ref + iteration source
             ref_images = [image_to_data_uri(p) for p in product_image_paths[:4]]
@@ -538,39 +561,51 @@ TONE: {strategy['tone_of_voice']}"""
                 if iter_img and Path(iter_img["filepath"]).exists():
                     ref_images.append(image_to_data_uri(Path(iter_img["filepath"])))
 
-            # Use edit endpoint if we have any reference images
-            if ref_images:
-                endpoint = EDIT_ENDPOINT
-                payload["image_urls"] = ref_images[:14]
-            else:
-                endpoint = TEXT2IMG_ENDPOINT
+            # Loop through each requested format
+            for fmt_idx, fmt in enumerate(gen_formats):
+                fmt_aspect = fmt if fmt in FORMAT_TO_RESOLUTION else gen["aspect_ratio"]
+                payload = {
+                    "prompt": prompt,
+                    "aspect_ratio": fmt_aspect,
+                    "num_images": batch_size,
+                    "output_format": "png",
+                    "resolution": gen["resolution"],
+                }
 
-            try:
-                submit_resp = fal_submit(endpoint, payload)
-                request_id = submit_resp["request_id"]
-                result = fal_poll(submit_resp)
+                # Use edit endpoint if we have any reference images
+                if ref_images:
+                    endpoint = EDIT_ENDPOINT
+                    payload["image_urls"] = ref_images[:14]
+                else:
+                    endpoint = TEXT2IMG_ENDPOINT
 
-                if result and "images" in result:
-                    for i, img_data in enumerate(result["images"]):
-                        img_url = img_data.get("url", "")
-                        if not img_url:
-                            continue
-                        img_id = str(uuid.uuid4())
-                        filename = f"crea_{batch_num}_{i+1}.png"
-                        filepath = gen_output_dir / filename
-                        fal_download(img_url, filepath)
+                try:
+                    submit_resp = fal_submit(endpoint, payload)
+                    request_id = submit_resp["request_id"]
+                    result = fal_poll(submit_resp)
 
-                        conn.execute(
-                            "INSERT INTO generated_images (id, generation_id, filename, filepath, prompt_used, fal_request_id) VALUES (?, ?, ?, ?, ?, ?)",
-                            (img_id, generation_id, filename, str(filepath), prompt[:500], request_id)
-                        )
-                        total_created += 1
-                        conn.commit()
+                    if result and "images" in result:
+                        for i, img_data in enumerate(result["images"]):
+                            img_url = img_data.get("url", "")
+                            if not img_url:
+                                continue
+                            img_id = str(uuid.uuid4())
+                            fmt_label = fmt_aspect.replace(":", "x")
+                            filename = f"crea_{batch_num}_{fmt_label}_{i+1}.png"
+                            filepath = gen_output_dir / filename
+                            fal_download(img_url, filepath)
 
-            except Exception as e:
-                import traceback
-                print(f"Batch {batch_num} error: {e}", flush=True)
-                traceback.print_exc()
+                            conn.execute(
+                                "INSERT INTO generated_images (id, generation_id, filename, filepath, prompt_used, fal_request_id) VALUES (?, ?, ?, ?, ?, ?)",
+                                (img_id, generation_id, filename, str(filepath), prompt[:500], request_id)
+                            )
+                            total_created += 1
+                            conn.commit()
+
+                except Exception as e:
+                    import traceback
+                    print(f"Batch {batch_num} format {fmt_aspect} error: {e}", flush=True)
+                    traceback.print_exc()
 
             remaining -= batch_size
 
@@ -820,6 +855,21 @@ async def add_product_images(
     return added
 
 
+@app.put("/api/products/{product_id}")
+async def update_product(product_id: str, request: Request):
+    data = await request.json()
+    conn = get_db()
+    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+    if not product:
+        conn.close()
+        raise HTTPException(404, "Product not found")
+    conn.execute("UPDATE products SET name=?, page_url=?, brief=? WHERE id=?",
+        (data.get("name", product["name"]), data.get("page_url", product["page_url"]), data.get("brief", product["brief"]), product_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 @app.delete("/api/product-images/{image_id}")
 async def delete_product_image(image_id: str):
     conn = get_db()
@@ -847,6 +897,8 @@ async def start_generation(
     custom_prompt: str = Form(""),
     iteration_of: str = Form(""),
     style_ref_id: str = Form(""),
+    language: str = Form("fr"),
+    formats: str = Form('["4:5"]'),
 ):
     if not FAL_KEY:
         raise HTTPException(400, "FAL_KEY not configured. Set the FAL_KEY environment variable.")
@@ -857,11 +909,11 @@ async def start_generation(
         """INSERT INTO generations
            (id, brand_id, product_id, num_creations, aspect_ratio, resolution,
             marketing_messages, customer_reviews, custom_prompt, status,
-            iteration_of, style_ref_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)""",
+            iteration_of, style_ref_id, language, formats)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)""",
         (gen_id, brand_id, product_id or None, num_creations, aspect_ratio,
          resolution, marketing_messages, customer_reviews, custom_prompt,
-         iteration_of or None, style_ref_id or None)
+         iteration_of or None, style_ref_id or None, language, formats)
     )
     conn.commit()
     conn.close()
@@ -873,12 +925,40 @@ async def start_generation(
     return {"id": gen_id, "status": "pending"}
 
 
+@app.get("/api/estimate-cost")
+async def estimate_cost(count: int = 1, formats: int = 1):
+    cost_per_image = 0.04
+    total = count * formats * cost_per_image
+    return {"cost_per_image": cost_per_image, "total_cost": round(total, 2), "total_images": count * formats}
+
+
 @app.get("/api/generations")
-async def list_generations():
+async def list_generations(request: Request):
     conn = get_db()
-    gens = conn.execute(
-        "SELECT g.*, b.name as brand_name FROM generations g LEFT JOIN brands b ON g.brand_id = b.id ORDER BY g.created_at DESC"
-    ).fetchall()
+    params = request.query_params
+    type_filter = params.get("type")
+    product_id_filter = params.get("product_id")
+    verdict_filter = params.get("verdict")
+
+    query = "SELECT g.*, b.name as brand_name FROM generations g LEFT JOIN brands b ON g.brand_id = b.id"
+    conditions = []
+    bind_vals = []
+
+    if type_filter:
+        conditions.append("g.generation_mode = ?")
+        bind_vals.append(type_filter)
+    if product_id_filter:
+        conditions.append("g.product_id = ?")
+        bind_vals.append(product_id_filter)
+    if verdict_filter:
+        conditions.append("g.id IN (SELECT generation_id FROM generated_images WHERE rating = ?)")
+        bind_vals.append(verdict_filter)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+    query += " ORDER BY g.created_at DESC"
+
+    gens = conn.execute(query, bind_vals).fetchall()
     result = []
     for g in gens:
         gd = dict(g)
@@ -936,6 +1016,33 @@ async def delete_generated_image(image_id: str):
         conn.commit()
     conn.close()
     return {"ok": True}
+
+
+@app.post("/api/generated-images/{image_id}/regenerate")
+async def regenerate_image(image_id: str):
+    conn = get_db()
+    img = conn.execute("SELECT * FROM generated_images WHERE id=?", (image_id,)).fetchone()
+    if not img:
+        conn.close()
+        raise HTTPException(404)
+    gen = conn.execute("SELECT * FROM generations WHERE id=?", (img["generation_id"],)).fetchone()
+    if not gen:
+        conn.close()
+        raise HTTPException(404)
+    # Create new generation with same params
+    import threading
+    new_id = str(uuid.uuid4())
+    conn.execute("""INSERT INTO generations (id, brand_id, product_id, num_creations, aspect_ratio, resolution,
+        marketing_messages, customer_reviews, custom_prompt, status, iteration_of, style_ref_id, language, formats)
+        VALUES (?,?,?,1,?,?,?,?,?,'pending',?,?,?,?)""",
+        (new_id, gen["brand_id"], gen["product_id"], gen["aspect_ratio"], gen["resolution"],
+         gen["marketing_messages"], gen["customer_reviews"], gen["custom_prompt"],
+         gen.get("iteration_of"), gen.get("style_ref_id"),
+         gen.get("language", "fr"), gen.get("formats", '["4:5"]')))
+    conn.commit()
+    conn.close()
+    threading.Thread(target=run_generation, args=(new_id,), daemon=True).start()
+    return {"generation_id": new_id}
 
 
 # --- API: Image serving ---
@@ -1233,9 +1340,9 @@ async def create_competitor(brand_id: str, data: dict):
 
     comp_id = str(uuid.uuid4())
     conn.execute(
-        "INSERT INTO competitors (id, brand_id, name, url, type, notes) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO competitors (id, brand_id, name, url, type, notes, market) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (comp_id, brand_id, data.get("name", ""), data.get("url", ""),
-         data.get("type", "direct"), data.get("notes", ""))
+         data.get("type", "direct"), data.get("notes", ""), data.get("market", "EU"))
     )
     conn.commit()
     row = conn.execute("SELECT * FROM competitors WHERE id = ?", (comp_id,)).fetchone()
