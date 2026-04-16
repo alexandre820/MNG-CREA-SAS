@@ -194,6 +194,7 @@ def init_db():
             url TEXT DEFAULT '',
             type TEXT DEFAULT 'direct',
             notes TEXT DEFAULT '',
+            market TEXT DEFAULT 'EU',
             created_at TEXT DEFAULT (datetime('now'))
         );
     """)
