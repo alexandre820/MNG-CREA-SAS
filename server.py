@@ -153,6 +153,7 @@ def init_db():
         "ALTER TABLE competitors ADD COLUMN market TEXT DEFAULT 'EU'",
         "ALTER TABLE generations ADD COLUMN language TEXT DEFAULT 'fr'",
         "ALTER TABLE generations ADD COLUMN formats TEXT DEFAULT '[\"4:5\"]'",
+        "ALTER TABLE generations ADD COLUMN structure_id TEXT DEFAULT ''",
     ]:
         try:
             conn.execute(stmt)
@@ -291,41 +292,83 @@ def image_to_data_uri(image_path: Path) -> str:
 
 import random
 
-# Ad composition templates — each generates a different visual style
-# {angle} = the user's marketing angle, {product} = product name, {headline} = generated headline
-AD_COMPOSITIONS = [
-    # Split before/after
-    "Split composition static ad. Left side: person experiencing the PROBLEM ({angle}) — muted grey/desaturated tones, discomfort visible. Right side: same person happy/energized holding the {product} product — vibrant purple tones, warm light. Bold headline text at top: \"{headline}\". Professional advertising photography.",
-    # Ingredient explosion
-    "Static ad creative. The {product} product package in center, with raw natural ingredients (mushrooms, cacao, coffee beans, adaptogenic herbs) exploding outward in an artistic arrangement around it. Dark moody background. Bold text overlay: \"{headline}\". Premium food photography style, warm directional lighting.",
-    # Lifestyle morning routine
-    "Static ad creative. Lifestyle scene: attractive person in modern kitchen, morning golden light, holding a steaming cup while the {product} product sits on the marble counter. Text overlay: \"{headline}\". Aspirational, warm, editorial photography. Shallow depth of field.",
-    # VS comparison
-    "Static ad creative. Side-by-side comparison. Left: a regular coffee cup with a red X, grey/cold tones. Right: a cup of {product} adaptogenic coffee with the product package, green checkmark, warm/vibrant tones. Text: \"{headline}\". Clean graphic design, bold contrast.",
-    # Testimonial/social proof style
-    "Static ad creative. Close-up portrait of a confident, focused person at their desk/workspace. The {product} product visible in foreground. Large quote text overlay: \"{headline}\". Magazine editorial style, warm amber lighting, shallow DOF.",
-    # Product hero with text
-    "Static ad creative. Hero product shot: {product} package dramatically lit on dark background, with bold typographic text overlay: \"{headline}\". Minimalist, premium, Apple-style product photography. Deep purple and warm gold accents.",
-    # Problem agitation
-    "Static ad creative. Visual metaphor for the problem ({angle}). Dramatic, attention-grabbing imagery that makes the viewer feel the pain point. The {product} product appears as the solution in the lower third. Bold headline: \"{headline}\". High contrast, editorial advertising.",
-    # Listicle/benefit stack
-    "Static ad creative with a numbered list layout. The {product} product on the right side. On the left, 3 key benefits written as bold text points related to: {angle}. Clean design, dark background, purple (#7643DE) accent highlights. Headline at top: \"{headline}\".",
-    # UGC-style
-    "Static ad creative that looks like an authentic social media post / UGC content. Casual photo of someone holding the {product} product in a real-life setting (cafe, office, kitchen). Text overlay styled like a social caption: \"{headline}\". Natural lighting, phone-camera aesthetic, relatable.",
-    # Scientific/credibility
-    "Static ad creative with a clinical/scientific aesthetic. The {product} product alongside visual representations of its key ingredients and their benefits for {angle}. Clean infographic-style layout with the headline: \"{headline}\". White/dark split background, professional, trustworthy.",
+# 5 proven ad structures based on competitive analysis (competitive-creative-patterns.md)
+# {headline} = generated headline, {product} = product name, {aspect} = aspect ratio, {bg_color} = background color, {headline_style} = headline font style
+AD_STRUCTURES = [
+    {
+        "id": "S1_pain_solution",
+        "name": "Pain Point + Solution",
+        "description": "Bold pain point headline + product hero + trust bar",
+        "prompt_template": "Static ad creative, vertical {aspect}. TOP: Bold {headline_style} headline text '{headline}' on {bg_color} background, large and attention-grabbing. MIDDLE: Product photography of the {product} with natural ingredients (mushrooms, coffee beans, herbs) beautifully arranged. BOTTOM: Trust bar with stars rating, customer count, and guarantee badge. Clean, premium, editorial magazine feel. The product packaging must be clearly visible and prominent."
+    },
+    {
+        "id": "S2_comparison",
+        "name": "Comparaison Split",
+        "description": "Us vs them split layout with checkmarks",
+        "prompt_template": "Static ad creative, vertical {aspect}. SPLIT LAYOUT: Left side labeled 'Cafe Classique' with red X marks next to problems (crash, bloating, anxiety) on gray/muted background. Right side labeled '{product}' with green checkmarks next to benefits (stable energy, digestion, focus) on bright/vibrant background. Product photo on the right side. Bottom trust bar. Clean graphic design, not photographic."
+    },
+    {
+        "id": "S3_price_slash",
+        "name": "Prix Barré + Urgence",
+        "description": "Crossed-out price + deal + CTA button",
+        "prompt_template": "Static ad creative, vertical {aspect}. TOP: Large crossed-out old price in red with new lower price in bold black/white. Discount percentage badge. MIDDLE: Beautiful product photography of {product} with coffee cup and natural setting. BOTTOM: Bold CTA button 'COMMANDER MAINTENANT' + 'Livraison offerte' text + trust badges. Warm, inviting, premium feel with urgency."
+    },
+    {
+        "id": "S4_listicle",
+        "name": "Listicle Bénéfices",
+        "description": "Product center + benefit bubbles around it",
+        "prompt_template": "Static ad creative, vertical {aspect}. CENTER: {product} product packaging beautifully photographed with natural ingredients. AROUND THE PRODUCT: 4 benefit bubbles/badges with checkmarks: Focus, Energy, Digestion, Anti-stress. Each bubble has a small icon and short text. TOP: Brand headline. BOTTOM: Trust bar with rating and guarantee. Clean, organized, magazine editorial layout."
+    },
+    {
+        "id": "S5_testimonial",
+        "name": "Témoignage Client",
+        "description": "Customer quote + stars + product",
+        "prompt_template": "Static ad creative, vertical {aspect}. TOP: Large quotation marks, then customer testimonial quote in elegant serif italic font: '{headline}'. Customer first name below the quote. MIDDLE: Five gold stars + 'Trustpilot Excellent 4.8/5' badge. BOTTOM: Small product photo of {product} + trust bar with '20 000+ clients satisfaits'. Warm, authentic, trustworthy feel. Light/cream background."
+    }
 ]
 
-# Headline generators per angle theme
+# Headline generators per angle theme — validated from competitive analysis
 ANGLE_HEADLINES = {
-    "ballonnement": ["Fini les ballonnements", "Ton ventre te dit merci", "Digestion legere, energie durable"],
-    "energie": ["Fini le crash. Place a l'energie qui dure.", "L'energie sans la descente", "8h d'energie stable, 0 crash"],
-    "focus": ["Ton cerveau en mode laser", "Focus total, sans le stress", "La concentration sans compromis"],
-    "stress": ["Moins de stress, plus de clarte", "Calme ton cortisol naturellement", "Anti-stress dans ta tasse"],
-    "sommeil": ["Dors mieux, performe plus", "Le sommeil reparateur commence ici", "Tes nuits vont changer"],
-    "cafe": ["Le cafe qui nourrit ton cerveau", "Mieux que ton espresso", "Le cafe 2.0 aux adaptogenes"],
-    "naturel": ["8 adaptogenes. 0 cochonnerie.", "100% clean, 100% efficace", "La nature, pas la chimie"],
-    "default": ["Upgrade ta routine.", "Le supplement qui change tout.", "Ta meilleure version commence ici."],
+    "ballonnements": [
+        "Ton café te ballonne. Celui-ci répare ta digestion.",
+        "Fini le ventre gonflé après le café.",
+        "Si ton ventre gonfle après chaque café, lis ça.",
+    ],
+    "crash_energie": [
+        "Fini le crash de 14h.",
+        "Ton café te détruit. Celui-ci te booste.",
+        "Énergie stable 10h. Sans crash. Sans nervosité.",
+    ],
+    "focus": [
+        "10h de focus. 1 tasse.",
+        "Ta meilleure version commence ici.",
+        "Focus laser sans la nervosité du café.",
+    ],
+    "alternative_cafe": [
+        "Le café le + dosé de France. 6225mg d'adaptogènes.",
+        "Upgrade ta routine café.",
+        "Ton rituel café, mais en version supérieure.",
+    ],
+    "stress": [
+        "Ton stress te ballonne.",
+        "Moins de stress, plus de clarté.",
+        "Le stress détruit ton ventre. La solution existe.",
+    ],
+    "naturel": [
+        "3 champignons + 3 plantes. 0 cochonnerie.",
+        "100% naturel. 6225mg par dose.",
+        "La formule la + concentrée du marché français.",
+    ],
+    "prix": [
+        "0,87€ par tasse. Ton Starbucks coûte 5€.",
+        "-20% + livraison offerte.",
+        "Essaie 60 jours. Satisfaite ou remboursée.",
+    ],
+    "social_proof": [
+        "20 000+ clients. 4.8/5 sur Trustpilot.",
+        "Elles l'ont testé. Elles ne reviennent plus au café.",
+        "Le secret de 20 000 françaises pour un ventre plat.",
+    ],
 }
 
 def generate_headline(angle_text: str) -> str:
@@ -334,7 +377,9 @@ def generate_headline(angle_text: str) -> str:
     for key, headlines in ANGLE_HEADLINES.items():
         if key in angle_lower:
             return random.choice(headlines)
-    return random.choice(ANGLE_HEADLINES["default"])
+    # Fallback: pick from a random angle
+    all_headlines = [h for headlines in ANGLE_HEADLINES.values() for h in headlines]
+    return random.choice(all_headlines)
 
 
 def build_prompt(brand_dna: str, product_name: str, aspect_ratio: str,
@@ -343,7 +388,8 @@ def build_prompt(brand_dna: str, product_name: str, aspect_ratio: str,
                  has_style_ref: bool = False,
                  strategy_context: str = "",
                  feedback_context: str = "",
-                 language: str = "fr") -> str:
+                 language: str = "fr",
+                 structure_id: str = "") -> str:
     """Build a generation prompt from brand DNA + product + marketing context."""
 
     def _apply_language(prompt: str) -> str:
@@ -414,13 +460,28 @@ Style: Professional advertising photography, warm directional lighting, editoria
 {feedback_context}""")
 
     # STANDARD MODE: generate from angle
-    headline = generate_headline(angle_text) if angle_text else random.choice(ANGLE_HEADLINES["default"])
+    all_headlines = [h for headlines in ANGLE_HEADLINES.values() for h in headlines]
+    headline = generate_headline(angle_text) if angle_text else random.choice(all_headlines)
 
-    # Pick a random composition template
-    composition = random.choice(AD_COMPOSITIONS)
-    composition = composition.replace("{angle}", angle_text or "fatigue et manque d'energie")
-    composition = composition.replace("{product}", product_name)
+    # Pick a structure — specific one if structure_id provided, else random
+    selected_structure = None
+    if structure_id:
+        for s in AD_STRUCTURES:
+            if s["id"] == structure_id:
+                selected_structure = s
+                break
+    if not selected_structure:
+        selected_structure = random.choice(AD_STRUCTURES)
+
+    # Fill in the prompt template placeholders
+    bg_colors = ["deep purple (#7643DE)", "sage green (#8FAE8B)", "warm cream (#F5F0E8)", "dark charcoal (#1A1A1A)"]
+    headline_styles = ["serif bold italic", "sans-serif bold uppercase", "handwritten bold"]
+    composition = selected_structure["prompt_template"]
     composition = composition.replace("{headline}", headline)
+    composition = composition.replace("{product}", product_name)
+    composition = composition.replace("{aspect}", aspect_ratio)
+    composition = composition.replace("{bg_color}", random.choice(bg_colors))
+    composition = composition.replace("{headline_style}", random.choice(headline_styles))
 
     return _apply_language(f"""Static advertisement for Meta/Instagram. {aspect_ratio} vertical format.
 
@@ -532,6 +593,8 @@ TONE: {strategy['tone_of_voice']}"""
 
             gen_language = gen.get("language", "fr") or "fr"
 
+            gen_structure_id = gen.get("structure_id", "") or ""
+
             prompt = build_prompt(
                 brand_dna=brand_dna,
                 product_name=product_name,
@@ -544,6 +607,7 @@ TONE: {strategy['tone_of_voice']}"""
                 strategy_context=strategy_context,
                 feedback_context=feedback_context,
                 language=gen_language,
+                structure_id=gen_structure_id,
             )
 
             # Collect reference images: product packshots + style ref + iteration source
@@ -899,6 +963,7 @@ async def start_generation(
     style_ref_id: str = Form(""),
     language: str = Form("fr"),
     formats: str = Form('["4:5"]'),
+    structure_id: str = Form(""),
 ):
     if not FAL_KEY:
         raise HTTPException(400, "FAL_KEY not configured. Set the FAL_KEY environment variable.")
@@ -909,11 +974,12 @@ async def start_generation(
         """INSERT INTO generations
            (id, brand_id, product_id, num_creations, aspect_ratio, resolution,
             marketing_messages, customer_reviews, custom_prompt, status,
-            iteration_of, style_ref_id, language, formats)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)""",
+            iteration_of, style_ref_id, language, formats, structure_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)""",
         (gen_id, brand_id, product_id or None, num_creations, aspect_ratio,
          resolution, marketing_messages, customer_reviews, custom_prompt,
-         iteration_of or None, style_ref_id or None, language, formats)
+         iteration_of or None, style_ref_id or None, language, formats,
+         structure_id or "")
     )
     conn.commit()
     conn.close()
@@ -1033,12 +1099,13 @@ async def regenerate_image(image_id: str):
     import threading
     new_id = str(uuid.uuid4())
     conn.execute("""INSERT INTO generations (id, brand_id, product_id, num_creations, aspect_ratio, resolution,
-        marketing_messages, customer_reviews, custom_prompt, status, iteration_of, style_ref_id, language, formats)
-        VALUES (?,?,?,1,?,?,?,?,?,'pending',?,?,?,?)""",
+        marketing_messages, customer_reviews, custom_prompt, status, iteration_of, style_ref_id, language, formats, structure_id)
+        VALUES (?,?,?,1,?,?,?,?,?,'pending',?,?,?,?,?)""",
         (new_id, gen["brand_id"], gen["product_id"], gen["aspect_ratio"], gen["resolution"],
          gen["marketing_messages"], gen["customer_reviews"], gen["custom_prompt"],
          gen.get("iteration_of"), gen.get("style_ref_id"),
-         gen.get("language", "fr"), gen.get("formats", '["4:5"]')))
+         gen.get("language", "fr"), gen.get("formats", '["4:5"]'),
+         gen.get("structure_id", "")))
     conn.commit()
     conn.close()
     threading.Thread(target=run_generation, args=(new_id,), daemon=True).start()
@@ -1086,6 +1153,17 @@ async def update_settings(data: dict):
 @app.get("/api/fal-status")
 async def fal_status():
     return {"configured": bool(FAL_KEY)}
+
+
+# --- API: Ad Structures & Angles ---
+@app.get("/api/structures")
+async def get_structures():
+    return [{"id": s["id"], "name": s["name"], "description": s["description"]} for s in AD_STRUCTURES]
+
+
+@app.get("/api/angles")
+async def get_angles():
+    return {k: v for k, v in ANGLE_HEADLINES.items()}
 
 
 # --- API: Inspiration Library ---
@@ -1414,7 +1492,7 @@ async def generate_strategy_angles(brand_id: str):
             comp_name = comp["name"]
             suggested_angles.append({
                 "angle": f"Pourquoi {brand['name']} et pas {comp_name}",
-                "headline": generate_headline("cafe"),
+                "headline": generate_headline("alternative_cafe"),
                 "funnel_stage": "product_aware",
                 "rationale": f"Angle comparatif vs {comp_name} ({comp['type']}). Positionne la marque comme superieure.",
             })
@@ -1423,13 +1501,12 @@ async def generate_strategy_angles(brand_id: str):
         # No strategy data — generate generic angles from brand DNA
         brand_dna = brand["brand_dna"] or ""
         for angle_key, headlines in ANGLE_HEADLINES.items():
-            if angle_key != "default":
-                suggested_angles.append({
-                    "angle": angle_key,
-                    "headline": random.choice(headlines),
-                    "funnel_stage": "problem_aware",
-                    "rationale": f"Angle generique base sur le theme '{angle_key}'. Ajoutez une strategie de marque pour des suggestions plus precises.",
-                })
+            suggested_angles.append({
+                "angle": angle_key,
+                "headline": random.choice(headlines),
+                "funnel_stage": "problem_aware",
+                "rationale": f"Angle generique base sur le theme '{angle_key}'. Ajoutez une strategie de marque pour des suggestions plus precises.",
+            })
 
     return {"suggested_angles": suggested_angles}
 
