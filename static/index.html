@@ -3004,7 +3004,7 @@ async function loadTrendingAds() {
   state.trending.loading = true;
   renderPage();
   try {
-    const res = await api(`/api/trendtrack/top-ads?period=${state.trending.period}&media_type=${state.trending.mediaType}&limit=30`);
+    const res = await api(`/api/trendtrack/top-ads?period=${state.trending.period}&media_type=${state.trending.mediaType}&limit=60`);
     state.trending.ads = res.ads || [];
     state.trending.credits = res.credits_remaining || '?';
     state.trending.loading = false;
