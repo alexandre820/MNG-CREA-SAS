@@ -1176,6 +1176,109 @@ async def get_angles():
     return {k: v for k, v in ANGLE_HEADLINES.items()}
 
 
+# --- API: Ad Doctor refresh ---
+AD_DOCTOR_DIR = Path("/Users/alex/Claude Code/ad_doctor_mng")
+
+@app.post("/api/ad-doctor/refresh")
+async def refresh_ad_doctor():
+    """
+    Re-pull MNG Meta Ads data from Ad Doctor (last 7d).
+    Saves to data/mng_top_7d.json so /api/my-top-ads serves fresh data.
+    """
+    if not AD_DOCTOR_DIR.exists():
+        raise HTTPException(503, "Ad Doctor not available on this host")
+
+    import subprocess
+    try:
+        # Run the pull via Ad Doctor's venv
+        cmd = [
+            "bash", "-c",
+            f'cd "{AD_DOCTOR_DIR}" && source venv/bin/activate && python3 -c "'
+            "from meta_client import MetaClient\n"
+            "from classifier import parse_ad, classify\n"
+            "from dataclasses import asdict\n"
+            "import json\n"
+            "mc = MetaClient()\n"
+            "mc.ensure_valid_token()\n"
+            "ads = mc.fetch_insights(date_preset='last_7d', active_only=False)\n"
+            "results = []\n"
+            "for raw in ads:\n"
+            "    if float(raw.get('spend', 0)) < 5: continue\n"
+            "    parsed = parse_ad(raw)\n"
+            "    classified = classify(parsed)\n"
+            "    results.append(asdict(classified))\n"
+            "results.sort(key=lambda x: x.get('spend',0), reverse=True)\n"
+            f"json.dump(results, open('{DATA_DIR}/mng_top_7d.json','w'), default=str)\n"
+            "print(len(results))\n"
+            '"'
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode != 0:
+            return {"ok": False, "error": result.stderr[-500:]}
+
+        # Parse result
+        count = int(result.stdout.strip().split('\n')[-1]) if result.stdout.strip() else 0
+        return {"ok": True, "count": count, "refreshed_at": datetime.now().isoformat()}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Timeout (Meta API slow)"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/api/ad-doctor/thumbnail/{ad_id}")
+async def get_ad_thumbnail(ad_id: str):
+    """Get the creative thumbnail URL for a given Meta ad ID."""
+    # Read META_ACCESS_TOKEN from Ad Doctor's .env
+    token = ""
+    env_path = AD_DOCTOR_DIR / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.startswith("META_ACCESS_TOKEN="):
+                token = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    if not token:
+        raise HTTPException(503, "Meta token not available")
+
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v23.0/{ad_id}",
+            params={
+                "fields": "creative{thumbnail_url,image_url,object_story_spec,asset_feed_spec}",
+                "access_token": token,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        creative = data.get("creative", {})
+        return {
+            "ad_id": ad_id,
+            "thumbnail_url": creative.get("thumbnail_url", ""),
+            "image_url": creative.get("image_url", ""),
+            "creative_id": creative.get("id", ""),
+        }
+    except Exception as e:
+        return {"ad_id": ad_id, "thumbnail_url": "", "error": str(e)}
+
+
+@app.get("/api/ad-doctor/status")
+async def ad_doctor_status():
+    """Check if Ad Doctor is reachable."""
+    if not AD_DOCTOR_DIR.exists():
+        return {"available": False, "reason": "Ad Doctor folder not found"}
+
+    data_path = DATA_DIR / "mng_top_7d.json"
+    last_refresh = None
+    if data_path.exists():
+        last_refresh = datetime.fromtimestamp(data_path.stat().st_mtime).isoformat()
+
+    return {
+        "available": True,
+        "last_refresh": last_refresh,
+        "data_exists": data_path.exists(),
+    }
+
+
 # --- API: TrendTrack — Top créas de la semaine ---
 @app.get("/api/trendtrack/status")
 async def trendtrack_status():
@@ -1255,11 +1358,57 @@ async def trendtrack_top_ads(
         raise HTTPException(500, f"TrendTrack request failed: {str(e)}")
 
 
+def _get_meta_token() -> str:
+    env_path = AD_DOCTOR_DIR / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            if line.startswith("META_ACCESS_TOKEN="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
+def _fetch_ad_thumbnail(ad_id: str, token: str) -> str:
+    """Fetch single ad thumbnail. Returns URL or empty string."""
+    if not ad_id or not token:
+        return ""
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/v23.0/{ad_id}",
+            params={"fields": "creative{thumbnail_url,image_url}", "access_token": token},
+            timeout=8,
+        )
+        if r.status_code == 200:
+            data = r.json()
+            creative = data.get("creative", {})
+            return creative.get("image_url") or creative.get("thumbnail_url", "")
+    except Exception:
+        pass
+    return ""
+
+
+def _load_thumbnail_cache() -> dict:
+    cache_path = DATA_DIR / "meta_thumbnails_cache.json"
+    if cache_path.exists():
+        try:
+            return json.loads(cache_path.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_thumbnail_cache(cache: dict) -> None:
+    cache_path = DATA_DIR / "meta_thumbnails_cache.json"
+    try:
+        cache_path.write_text(json.dumps(cache))
+    except Exception:
+        pass
+
+
 @app.get("/api/my-top-ads")
 async def my_top_ads():
     """
     Pull MNG's own top static ads from last 7 days (via Ad Doctor data),
-    enrichi avec recommandations d'itération Andromeda-safe.
+    enrichi avec recommandations d'itération Andromeda-safe + thumbnails Meta.
     """
     data_path = DATA_DIR / "mng_top_7d.json"
     if not data_path.exists():
@@ -1269,6 +1418,23 @@ async def my_top_ads():
         ads = json.loads(data_path.read_text())
     except Exception as e:
         return {"ads": [], "error": f"Failed to load data: {e}"}
+
+    # Fetch thumbnails for all ads (with caching)
+    token = _get_meta_token()
+    thumb_cache = _load_thumbnail_cache()
+    thumbs_to_fetch = [a.get("ad_id") for a in ads if a.get("ad_id") and a.get("ad_id") not in thumb_cache]
+
+    if thumbs_to_fetch and token:
+        # Parallel fetch with thread pool
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = {ad_id: ex.submit(_fetch_ad_thumbnail, ad_id, token) for ad_id in thumbs_to_fetch}
+            for ad_id, fut in futures.items():
+                try:
+                    thumb_cache[ad_id] = fut.result(timeout=10)
+                except Exception:
+                    thumb_cache[ad_id] = ""
+        _save_thumbnail_cache(thumb_cache)
 
     # Filter statics only (S_ prefix or no V_ prefix), enrich with iteration ideas
     enriched = []
@@ -1289,6 +1455,7 @@ async def my_top_ads():
         enriched.append({
             "ad_id": ad.get("ad_id"),
             "name": ad.get("ad_name", "?"),
+            "thumbnail": thumb_cache.get(ad.get("ad_id"), ""),
             "campaign": ad.get("campaign_name", ""),
             "adset": ad.get("adset_name", ""),
             "spend": round(spend, 2),

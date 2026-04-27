@@ -2597,7 +2597,11 @@ function renderTrending(el) {
           <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">⚡ TES TOP CRÉAS — 7 derniers jours</div>
           <h2 style="font-family:var(--font-serif);font-size:24px;margin-top:4px;">Mes statics gagnants</h2>
         </div>
-        <button class="btn btn-secondary" onclick="loadMyTopAds()" id="my-ads-refresh">🔄 Refresh</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="my-ads-freshness" style="font-size:11px;color:var(--text-muted);"></span>
+          <button class="btn btn-secondary" onclick="refreshAdDoctor()" id="ad-doctor-refresh" title="Re-pull data depuis Meta via Ad Doctor">🔌 Sync Meta</button>
+          <button class="btn btn-secondary" onclick="loadMyTopAds()" id="my-ads-refresh">🔄 Refresh</button>
+        </div>
       </div>
       <div id="my-top-ads-container">
         <div style="text-align:center;padding:40px;color:var(--text-muted);">Chargement...</div>
@@ -2654,7 +2658,7 @@ function renderTrending(el) {
         ${t.ads.map((ad, idx) => `
           <div class="card" style="padding:0;overflow:hidden;cursor:pointer;" onclick="openTrendingDetail('${ad.id}')">
             <div style="position:relative;aspect-ratio:1/1;background:#f4f4f8;overflow:hidden;">
-              ${ad.thumbnail ? `<img src="${ad.thumbnail}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;\\'>🚫 Image indisponible</div>'">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;">🚫 Pas d\\'image</div>'}
+              ${ad.thumbnail ? `<img src="${ad.thumbnail}" style="width:100%;height:100%;object-fit:cover;" onerror="this.onerror=null;this.style.opacity='0.3'">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;">🚫 Pas d image</div>'}
               <div style="position:absolute;top:8px;left:8px;background:linear-gradient(135deg,#ef4444,#f97316);color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">
                 #${idx+1}
               </div>
@@ -2696,9 +2700,46 @@ function renderTrending(el) {
   loadMyTopAds();
 }
 
+async function refreshAdDoctor() {
+  const btn = document.getElementById('ad-doctor-refresh');
+  if (!btn) return;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ Sync en cours... (~60s)';
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/ad-doctor/refresh', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      btn.innerHTML = `✅ ${data.count} ads sync`;
+      setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000);
+      loadMyTopAds(); // Reload data
+    } else {
+      btn.innerHTML = '❌ Erreur';
+      alert('Erreur Ad Doctor : ' + (data.error || 'inconnu'));
+      setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000);
+    }
+  } catch (e) {
+    btn.innerHTML = '❌ Erreur réseau';
+    setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 2000);
+  }
+}
+
 async function loadMyTopAds() {
   const container = document.getElementById('my-top-ads-container');
   if (!container) return;
+  // Show freshness
+  try {
+    const status = await api('/api/ad-doctor/status');
+    const freshEl = document.getElementById('my-ads-freshness');
+    if (freshEl && status.last_refresh) {
+      const date = new Date(status.last_refresh);
+      const ago = Math.round((Date.now() - date.getTime()) / 60000);
+      const agoStr = ago < 60 ? `${ago}min` : ago < 1440 ? `${Math.round(ago/60)}h` : `${Math.round(ago/1440)}j`;
+      freshEl.textContent = `Data : il y a ${agoStr}`;
+      if (ago > 1440) freshEl.style.color = '#f59e0b'; // older than 24h = warning
+    }
+  } catch(e) {}
+
   try {
     const res = await api('/api/my-top-ads');
     if (res.error) {
@@ -2740,10 +2781,14 @@ async function loadMyTopAds() {
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${ads.slice(0, 12).map(ad => `
-          <div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:white;">
+          <div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:white;display:grid;grid-template-columns:140px 1fr;gap:16px;">
+            <div style="aspect-ratio:1/1;background:#f4f4f8;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="if('${ad.thumbnail}')window.open('${ad.thumbnail}','_blank')">
+              ${ad.thumbnail ? `<img src="${ad.thumbnail}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.opacity='0.3'">` : `<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:8px;">📷<br>Pas de preview<br><span style="font-size:9px;">(sync Meta requis)</span></div>`}
+            </div>
+            <div>
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
-              <div style="flex:1;">
-                <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${ad.name}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;font-size:14px;margin-bottom:4px;word-break:break-word;">${ad.name}</div>
                 <div style="font-size:11px;color:var(--text-muted);">${ad.adset || ''}</div>
               </div>
               <span style="background:${verdictColor[ad.verdict]||'#999'};color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">
@@ -2777,6 +2822,7 @@ async function loadMyTopAds() {
                 </div>
               </details>
             ` : ''}
+            </div>
           </div>
         `).join('')}
       </div>
