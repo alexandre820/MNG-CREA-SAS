@@ -50,6 +50,16 @@ EDIT_ENDPOINT = "fal-ai/nano-banana-2/edit"
 POLL_INTERVAL = 2
 MAX_POLL_TIME = 300
 
+# TrendTrack API
+TRENDTRACK_API_KEY = os.environ.get("TRENDTRACK_API_KEY", "")
+if not TRENDTRACK_API_KEY:
+    _env_path = BASE_DIR / ".env"
+    if _env_path.exists():
+        for line in _env_path.read_text().splitlines():
+            if line.startswith("TRENDTRACK_API_KEY="):
+                TRENDTRACK_API_KEY = line.split("=", 1)[1].strip().strip('"').strip("'")
+TRENDTRACK_BASE = "https://api.trendtrack.io"
+
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 # Ensure dirs exist
@@ -1164,6 +1174,99 @@ async def get_structures():
 @app.get("/api/angles")
 async def get_angles():
     return {k: v for k, v in ANGLE_HEADLINES.items()}
+
+
+# --- API: TrendTrack — Top créas de la semaine ---
+@app.get("/api/trendtrack/status")
+async def trendtrack_status():
+    return {"configured": bool(TRENDTRACK_API_KEY)}
+
+
+@app.get("/api/trendtrack/top-ads")
+async def trendtrack_top_ads(
+    period: str = "rankDelta7d",
+    limit: int = 30,
+    media_type: str = "image",
+):
+    """
+    Récupère les créas qui ont le plus monté dans le ranking sur 7/14/30 jours,
+    cross-marques (toutes les marques trackées dans le workspace).
+    period: rankDelta7d | rankDelta14d | rankDelta30d | reachDelta7d | currentRank
+    media_type: image | video | all
+    """
+    if not TRENDTRACK_API_KEY:
+        raise HTTPException(503, "TrendTrack API not configured")
+
+    params = {"sortBy": period, "limit": min(limit, 100)}
+    if media_type and media_type != "all":
+        params["mediaType"] = media_type
+
+    headers = {"Authorization": f"Bearer {TRENDTRACK_API_KEY}"}
+    try:
+        r = requests.get(
+            f"{TRENDTRACK_BASE}/v1/workspace/top-ads",
+            headers=headers,
+            params=params,
+            timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+        # Simplify response for frontend
+        ads = []
+        for item in data.get("data", []):
+            ad = item.get("ad", {})
+            brand = item.get("brandtracker", {})
+            metrics = item.get("metrics", {}) or ad.get("metrics", {})
+            rank = ad.get("rank", {})
+            content = ad.get("content", {})
+            media = ad.get("media", {})
+            ads.append({
+                "id": ad.get("id", ""),
+                "brand_name": brand.get("name", ""),
+                "brand_logo": ad.get("advertiser", {}).get("logoUrl", ""),
+                "thumbnail": media.get("thumbnailUrl", ""),
+                "media_url": media.get("mediaUrl", ""),
+                "media_type": media.get("type", "image"),
+                "headline": content.get("title") or content.get("ctaDescription") or "",
+                "body": (content.get("body") or "")[:200],
+                "cta": content.get("callToAction", ""),
+                "landing_page": content.get("landingPageUrl", ""),
+                "days_running": ad.get("daysRunning", 0),
+                "current_rank": rank.get("currentRank", 0),
+                "rank_delta": rank.get("rankDelta", 0),
+                "improvement_pct": rank.get("improvementPct", 0),
+                "reach": metrics.get("totalReach", 0) or metrics.get("reach", 0),
+                "reach_delta_7d": metrics.get("reachDelta7d", 0),
+                "estimated_spend": metrics.get("estimatedSpend", 0),
+                "duplicates": metrics.get("duplicates", 0),
+                "first_seen": ad.get("firstSeenAt", ""),
+                "facebook_page_id": brand.get("facebookPageId", ""),
+            })
+        return {
+            "ads": ads,
+            "credits_remaining": r.headers.get("X-Credits-Remaining", "?"),
+            "credits_used": r.headers.get("X-Credits-Used", "?"),
+            "period": period,
+            "media_type": media_type,
+        }
+    except requests.exceptions.HTTPError as e:
+        raise HTTPException(e.response.status_code, f"TrendTrack error: {e.response.text[:200]}")
+    except Exception as e:
+        raise HTTPException(500, f"TrendTrack request failed: {str(e)}")
+
+
+@app.get("/api/trendtrack/usage")
+async def trendtrack_usage():
+    """Get TrendTrack credit balance."""
+    if not TRENDTRACK_API_KEY:
+        raise HTTPException(503, "TrendTrack API not configured")
+    headers = {"Authorization": f"Bearer {TRENDTRACK_API_KEY}"}
+    try:
+        r = requests.get(f"{TRENDTRACK_BASE}/v1/usage", headers=headers, timeout=10)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        raise HTTPException(500, f"TrendTrack usage failed: {str(e)}")
 
 
 # --- API: Inspiration Library ---

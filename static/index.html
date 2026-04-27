@@ -1287,6 +1287,11 @@ body {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           Inspirations
         </button>
+        <button class="nav-item" data-page="trending" onclick="navigate('trending')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          Top Créas
+          <span style="margin-left:auto;font-size:9px;background:linear-gradient(135deg,#ef4444,#f97316);color:white;padding:2px 6px;border-radius:8px;font-weight:600;">HOT</span>
+        </button>
       </div>
 
       <div class="nav-section">
@@ -1373,6 +1378,7 @@ function renderPage() {
       case 'generate': renderGenerate(main); break;
       case 'studio': renderStudio(main); break;
       case 'inspirations': renderInspirations(main); break;
+      case 'trending': renderTrending(main); break;
       case 'settings': renderSettings(main); break;
     }
   } catch(e) {
@@ -2558,6 +2564,177 @@ async function deleteTemplate(id) {
   await fetch(`/api/templates/${id}`, { method: 'DELETE' });
   await loadState();
   renderPage();
+}
+
+
+// ---- TOP CREAS / TRENDING PAGE ----
+function renderTrending(el) {
+  if (!state.trending) {
+    state.trending = { ads: [], loading: false, period: 'rankDelta7d', mediaType: 'image', credits: '?' };
+  }
+  const t = state.trending;
+
+  const periodLabels = {
+    'rankDelta7d': '7 derniers jours',
+    'rankDelta14d': '14 derniers jours',
+    'rankDelta30d': '30 derniers jours',
+    'reachDelta7d': 'Reach (7j)',
+    'currentRank': 'Top actuel'
+  };
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Top Créas <em>de la semaine</em></h1>
+        <p>Les statics qui ont explosé chez les concurrents — données live TrendTrack</p>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:var(--text-muted);">Crédits TT: <strong>${t.credits}</strong></span>
+        <button class="btn btn-primary" onclick="loadTrendingAds()" ${t.loading ? 'disabled' : ''}>
+          ${t.loading ? '⏳ Chargement...' : '🔄 Refresh'}
+        </button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Période</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${Object.entries(periodLabels).map(([k,v]) =>
+              `<button class="pill ${t.period===k?'active':''}" onclick="state.trending.period='${k}';loadTrendingAds()">${v}</button>`
+            ).join('')}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">Type</div>
+          <div style="display:flex;gap:6px;">
+            <button class="pill ${t.mediaType==='image'?'active':''}" onclick="state.trending.mediaType='image';loadTrendingAds()">📷 Statics</button>
+            <button class="pill ${t.mediaType==='video'?'active':''}" onclick="state.trending.mediaType='video';loadTrendingAds()">🎬 Vidéos</button>
+            <button class="pill ${t.mediaType==='all'?'active':''}" onclick="state.trending.mediaType='all';loadTrendingAds()">Tous</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    ${t.loading ? `
+      <div style="text-align:center;padding:80px 20px;">
+        <div class="spinner" style="margin:0 auto 16px;"></div>
+        <p style="color:var(--text-muted);">Récupération des top créas via TrendTrack...</p>
+      </div>
+    ` : t.ads.length === 0 ? `
+      <div class="card" style="text-align:center;padding:60px 20px;">
+        <div style="font-size:48px;margin-bottom:16px;">📊</div>
+        <h3 style="margin-bottom:8px;">Aucune donnée pour l'instant</h3>
+        <p style="color:var(--text-muted);">Clique sur Refresh pour charger les top créas de la semaine</p>
+      </div>
+    ` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;">
+        ${t.ads.map((ad, idx) => `
+          <div class="card" style="padding:0;overflow:hidden;cursor:pointer;" onclick="openTrendingDetail('${ad.id}')">
+            <div style="position:relative;aspect-ratio:1/1;background:#f4f4f8;overflow:hidden;">
+              ${ad.thumbnail ? `<img src="${ad.thumbnail}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;\\'>🚫 Image indisponible</div>'">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:13px;">🚫 Pas d\\'image</div>'}
+              <div style="position:absolute;top:8px;left:8px;background:linear-gradient(135deg,#ef4444,#f97316);color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">
+                #${idx+1}
+              </div>
+              ${ad.improvement_pct ? `
+                <div style="position:absolute;top:8px;right:8px;background:rgba(34,197,94,0.95);color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;">
+                  ↑ +${Math.round(ad.improvement_pct)}%
+                </div>
+              ` : ''}
+              ${ad.media_type === 'video' ? '<div style="position:absolute;bottom:8px;right:8px;background:rgba(0,0,0,0.7);color:white;padding:3px 8px;border-radius:12px;font-size:10px;">🎬 VIDEO</div>' : ''}
+            </div>
+            <div style="padding:14px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                ${ad.brand_logo ? `<img src="${ad.brand_logo}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;" onerror="this.style.display='none'">` : ''}
+                <strong style="font-size:13px;">${ad.brand_name}</strong>
+              </div>
+              <p style="font-size:12px;color:var(--text-muted);line-height:1.4;margin-bottom:10px;height:34px;overflow:hidden;">
+                ${(ad.headline || ad.body || '').slice(0, 80)}${(ad.headline || ad.body || '').length > 80 ? '...' : ''}
+              </p>
+              <div style="display:flex;gap:12px;font-size:11px;color:var(--text-muted);">
+                <span>📅 ${ad.days_running}j actif</span>
+                <span>📊 #${ad.current_rank}</span>
+                ${ad.duplicates ? `<span>🔁 ${ad.duplicates}x</span>` : ''}
+              </div>
+              <button class="btn btn-secondary" style="width:100%;margin-top:10px;font-size:12px;padding:8px;" onclick="event.stopPropagation();cloneToInspiration('${ad.thumbnail}','${ad.brand_name.replace(/'/g,"\\'")}');">
+                📎 Ajouter aux inspirations
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+
+  // Auto-load on first render if empty
+  if (t.ads.length === 0 && !t.loading) {
+    loadTrendingAds();
+  }
+}
+
+async function loadTrendingAds() {
+  state.trending = state.trending || { ads: [], loading: false, period: 'rankDelta7d', mediaType: 'image', credits: '?' };
+  state.trending.loading = true;
+  renderPage();
+  try {
+    const res = await api(`/api/trendtrack/top-ads?period=${state.trending.period}&media_type=${state.trending.mediaType}&limit=30`);
+    state.trending.ads = res.ads || [];
+    state.trending.credits = res.credits_remaining || '?';
+    state.trending.loading = false;
+    renderPage();
+  } catch (e) {
+    state.trending.loading = false;
+    state.trending.ads = [];
+    renderPage();
+    alert('Erreur TrendTrack : ' + e.message);
+  }
+}
+
+async function cloneToInspiration(thumbnailUrl, brandName) {
+  if (!thumbnailUrl) return alert('Image indisponible');
+  try {
+    // Fetch image and upload to inspirations
+    const imgRes = await fetch(thumbnailUrl);
+    const blob = await imgRes.blob();
+    const file = new File([blob], `${brandName.replace(/[^a-z0-9]/gi,'_')}_trending.jpg`, {type: blob.type || 'image/jpeg'});
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('label', `${brandName} — Top Crea`);
+    fd.append('source', 'trendtrack');
+    const brand = state.currentBrand;
+    if (!brand) return alert('Sélectionne une marque d\'abord');
+    await fetch(`/api/inspirations?brand_id=${brand.id}`, {method:'POST', body: fd});
+    alert(`✅ Ajouté aux inspirations : ${brandName}`);
+  } catch (e) {
+    alert('Erreur : ' + e.message);
+  }
+}
+
+function openTrendingDetail(adId) {
+  const ad = (state.trending?.ads || []).find(a => a.id === adId);
+  if (!ad) return;
+  // Simple modal preview
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;cursor:pointer;';
+  modal.onclick = () => modal.remove();
+  modal.innerHTML = `
+    <div style="background:white;border-radius:16px;max-width:600px;width:100%;max-height:90vh;overflow:auto;cursor:default;" onclick="event.stopPropagation();">
+      <img src="${ad.thumbnail}" style="width:100%;border-radius:16px 16px 0 0;">
+      <div style="padding:24px;">
+        <h2 style="font-family:var(--font-serif);font-size:24px;margin-bottom:8px;">${ad.brand_name}</h2>
+        <p style="color:var(--text-muted);margin-bottom:16px;">${ad.body}</p>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;font-size:13px;">
+          <div><strong>Rank actuel :</strong> #${ad.current_rank}</div>
+          <div><strong>Amélioration :</strong> +${Math.round(ad.improvement_pct||0)}%</div>
+          <div><strong>Jours actifs :</strong> ${ad.days_running}</div>
+          <div><strong>Duplicates :</strong> ${ad.duplicates}x</div>
+        </div>
+        ${ad.landing_page ? `<a href="${ad.landing_page}" target="_blank" class="btn btn-secondary" style="margin-top:16px;display:inline-block;">🔗 Voir la landing page</a>` : ''}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
 }
 
 
