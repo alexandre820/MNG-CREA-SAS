@@ -2729,9 +2729,14 @@ function renderTrending(el) {
                 <span>📊 #${ad.current_rank}</span>
                 ${ad.duplicates ? `<span>🔁 ${ad.duplicates}x</span>` : ''}
               </div>
-              <button class="btn btn-secondary" style="width:100%;margin-top:10px;font-size:12px;padding:8px;" onclick="event.stopPropagation();cloneToInspiration('${ad.thumbnail}','${ad.brand_name.replace(/'/g,"\\'")}');">
-                📎 Ajouter aux inspirations
-              </button>
+              <div style="display:flex;gap:6px;margin-top:10px;">
+                <button class="btn btn-primary" style="flex:1;font-size:12px;padding:8px;" onclick="event.stopPropagation();cloneCompetitorToGenerate('${ad.thumbnail}','${ad.brand_name.replace(/'/g,"\\'")}','${(ad.headline||'').replace(/'/g,"\\'")}');">
+                  ⚡ Cloner avec Brainstoorm
+                </button>
+                <button class="btn btn-secondary" style="font-size:12px;padding:8px;" onclick="event.stopPropagation();cloneToInspiration('${ad.thumbnail}','${ad.brand_name.replace(/'/g,"\\'")}');" title="Ajouter à la lib seulement">
+                  📎
+                </button>
+              </div>
             </div>
           </div>
         `).join('')}
@@ -2863,7 +2868,7 @@ async function loadMyTopAds() {
                       </div>
                       <div style="font-size:11px;color:var(--text-muted);line-height:1.4;margin-bottom:4px;">${it.rationale}</div>
                       <div style="font-size:11px;color:#0a0a0f;line-height:1.4;"><strong>→</strong> ${it.action}</div>
-                      <button class="btn btn-secondary" style="margin-top:6px;font-size:10px;padding:4px 10px;" onclick="navigateToGenerateWithIteration('${(ad.name||'').replace(/'/g,'')}', '${it.type}', '${(it.action||'').replace(/'/g,'').slice(0,80)}')">⚡ Générer cette itération</button>
+                      <button class="btn btn-primary" style="margin-top:6px;font-size:10px;padding:5px 12px;" onclick="navigateToGenerateWithIteration('${(ad.name||'').replace(/'/g,'')}', '${it.type}', '${(it.action||'').replace(/'/g,'').slice(0,80)}', '${ad.thumbnail||''}')">⚡ Générer cette itération</button>
                     </div>
                   `).join('')}
                 </div>
@@ -2879,16 +2884,102 @@ async function loadMyTopAds() {
   }
 }
 
-function navigateToGenerateWithIteration(adName, iterationType, action) {
-  state.iterationContext = { adName, iterationType, action };
+function _selectBrainstoorm() {
+  // Find Brainstoorm product (default for MNG)
+  const brainstoorm = (state.products || []).find(p =>
+    /brainstoorm/i.test(p.name || '')
+  );
+  if (brainstoorm) {
+    state.selectedProductId = brainstoorm.id;
+    return brainstoorm;
+  }
+  // Fallback: first product
+  if (state.products && state.products.length) {
+    state.selectedProductId = state.products[0].id;
+    return state.products[0];
+  }
+  return null;
+}
+
+async function navigateToGenerateWithIteration(adName, iterationType, action, thumbnailUrl) {
+  // 1. Auto-select Brainstoorm
+  const product = _selectBrainstoorm();
+
+  // 2. If we have a thumbnail (the source ad to iterate), clone it as inspiration
+  let inspoId = null;
+  if (thumbnailUrl) {
+    try {
+      const imgRes = await fetch(thumbnailUrl);
+      const blob = await imgRes.blob();
+      const file = new File([blob], `iter_${Date.now()}.jpg`, {type: blob.type || 'image/jpeg'});
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('label', `Source itération : ${adName.slice(0,40)}`);
+      fd.append('source', 'iteration');
+      const brand = state.currentBrand;
+      if (brand) {
+        const res = await fetch(`/api/inspirations?brand_id=${brand.id}`, {method:'POST', body: fd});
+        const data = await res.json();
+        inspoId = data.id || null;
+      }
+    } catch(e) { console.warn('Inspo clone failed', e); }
+  }
+
+  state.iterationContext = { adName, iterationType, action, sourceInspoId: inspoId };
   navigate('generate');
   setTimeout(() => {
     const angleInput = document.getElementById('angle-input');
     if (angleInput) {
-      angleInput.value = `Itération de "${adName.slice(0,40)}" : ${action}`;
+      angleInput.value = `Itération : ${action}`;
       angleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, 200);
+  }, 300);
+}
+
+async function cloneCompetitorToGenerate(thumbnailUrl, brandName, headline) {
+  // 1-click clone: download competitor ad → save as inspiration → select Brainstoorm → go to generate
+  if (!thumbnailUrl) return alert('Image indisponible');
+  const product = _selectBrainstoorm();
+  if (!product) return alert('Aucun produit configuré');
+  const brand = state.currentBrand;
+  if (!brand) return alert('Aucune marque configurée');
+
+  try {
+    // Download + upload as inspiration
+    const imgRes = await fetch(thumbnailUrl);
+    const blob = await imgRes.blob();
+    const safeName = brandName.replace(/[^a-z0-9]/gi,'_');
+    const file = new File([blob], `${safeName}_clone_${Date.now()}.jpg`, {type: blob.type || 'image/jpeg'});
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('label', `Clone : ${brandName}`);
+    fd.append('source', 'competitor_clone');
+    const res = await fetch(`/api/inspirations?brand_id=${brand.id}`, {method:'POST', body: fd});
+    const data = await res.json();
+
+    // Reload inspirations into state
+    state.inspirations = await api(`/api/inspirations?brand_id=${brand.id}`);
+
+    // Set the cloned inspo as the style ref + Brainstoorm as product
+    state.styleRefId = data.id;
+    state.iterationContext = {
+      adName: brandName + ' — clone',
+      iterationType: 'competitor_clone',
+      action: `Cloner cette créa ${brandName} avec MNG ${product.name}`,
+      sourceInspoId: data.id,
+    };
+
+    navigate('generate');
+    setTimeout(() => {
+      const angleInput = document.getElementById('angle-input');
+      if (angleInput) {
+        angleInput.value = headline ? `Adapter à MNG : ${headline.slice(0,60)}` : `Cloner ${brandName} avec ${product.name}`;
+        angleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  } catch (e) {
+    alert('Erreur : ' + e.message);
+  }
 }
 
 async function loadTrendingAds() {
