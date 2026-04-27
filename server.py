@@ -1300,34 +1300,87 @@ async def trendtrack_top_ads(
     if not TRENDTRACK_API_KEY:
         raise HTTPException(503, "TrendTrack API not configured")
 
-    params = {"sortBy": period, "limit": min(limit, 100)}
-    if media_type and media_type != "all":
-        params["mediaType"] = media_type
-
     headers = {"Authorization": f"Bearer {TRENDTRACK_API_KEY}"}
-    try:
-        r = requests.get(
-            f"{TRENDTRACK_BASE}/v1/workspace/top-ads",
-            headers=headers,
-            params=params,
-            timeout=30,
-        )
-        r.raise_for_status()
-        data = r.json()
-        # Simplify response for frontend
-        ads = []
-        for item in data.get("data", []):
-            ad = item.get("ad", {})
-            brand = item.get("brandtracker", {})
-            metrics = item.get("metrics", {}) or ad.get("metrics", {})
-            rank = ad.get("rank", {})
-            content = ad.get("content", {})
-            media = ad.get("media", {})
-            ads.append({
+
+    # Brands à inclure (mushroom coffee + suppléments + DTC FR de référence)
+    TARGET_BRANDS = [
+        ("RYZE Superfoods", "db2a6deb-2452-4e2a-87dc-e96650f60459"),
+        ("Bonjour", "af35a925-7fe2-43c3-8565-e40bf7b01502"),
+        ("French Mush", "0e463119-4c59-4162-9089-e47906b1b0a4"),
+        ("Wake Nutrition", "5cc26b79-2f5e-42a5-bf06-d040e2e9dd32"),
+        ("Dyna", "345b1ac1-304c-43b7-8c7a-85dddce3e222"),
+        ("AG1", "3b1b2e9c-7873-40c7-9442-a4d37ce412ab"),
+        ("Everyday Dose", "461e5c73-ca20-4ae2-8072-2bc1ed0a8343"),
+        ("Four Sigmatic", "aab4cbf7-ba6d-42c0-9507-70900b1f6de4"),
+        ("Spacegoods", "81464660-b02b-420a-bfa7-43a06929199c"),
+        ("Naali", "2b2a7ce5-4854-406c-8218-e173773dccae"),
+        ("Humble+", "52886604-cfee-43e9-b88e-f71980d1f01b"),
+        ("IM8 Health", "74dd7484-2a3f-449b-8174-c47e21b4efd5"),
+        ("Goli", "89223c90-e4b8-4c19-9f21-c0605c31a143"),
+        ("900.care", "c3ed97e7-5a3e-4004-aeac-d3a905ec810c"),
+        ("My Variations", "51acb0af-a258-4721-b055-ee4d5dd13de2"),
+        ("Flytex", "c045ee98-7e2c-4442-a10b-91e0045f6980"),
+        ("Lilly Skin", "98ea7adc-1239-4ed3-97ab-ddfad3bc0fcd"),
+        ("Fincut", "569832a7-e4dc-4630-8311-1abf4bf20642"),
+        ("Pacha", "30471bb0-3a8d-41df-b55e-dccf05a42219"),
+    ]
+
+    per_brand_cap = 3
+    all_ads = []
+    credits_remaining = "?"
+
+    # Pull top ads per brand in parallel
+    from concurrent.futures import ThreadPoolExecutor
+
+    def fetch_brand_ads(name_id):
+        name, brand_id = name_id
+        params = {"sortBy": period, "limit": per_brand_cap}
+        if media_type and media_type != "all":
+            params["mediaType"] = media_type
+        try:
+            r = requests.get(
+                f"{TRENDTRACK_BASE}/v1/brandtrackers/{brand_id}/top-ads",
+                headers=headers, params=params, timeout=30,
+            )
+            if r.status_code == 429:
+                # Rate limited — wait and retry once
+                import time as _t
+                _t.sleep(1)
+                r = requests.get(
+                    f"{TRENDTRACK_BASE}/v1/brandtrackers/{brand_id}/top-ads",
+                    headers=headers, params=params, timeout=30,
+                )
+            if r.status_code != 200:
+                return [], r.headers.get("X-Credits-Remaining", "?"), name
+            return r.json().get("data", []), r.headers.get("X-Credits-Remaining", "?"), name
+        except Exception as e:
+            return [], "?", name
+
+    # Smaller batches to avoid rate limit
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(fetch_brand_ads, TARGET_BRANDS))
+
+    for result, (brand_name, brand_id) in zip(results, TARGET_BRANDS):
+        data_items, creds, _ = result
+        if creds and creds != "?":
+            credits_remaining = creds
+        for item in (data_items or []):
+            if not item:
+                continue
+            ad = item.get("ad") or {}
+            metrics = (item.get("metrics") or ad.get("metrics") or {})
+            rank = ad.get("rank") or {}
+            content = ad.get("content") or {}
+            media = ad.get("media") or {}
+            tt_thumb = media.get("thumbnailUrl", "")
+            advertiser = ad.get("advertiser", {})
+            from urllib.parse import quote
+            all_ads.append({
                 "id": ad.get("id", ""),
-                "brand_name": brand.get("name", ""),
-                "brand_logo": ad.get("advertiser", {}).get("logoUrl", ""),
-                "thumbnail": media.get("thumbnailUrl", ""),
+                "brand_name": brand_name,
+                "brand_logo": advertiser.get("logoUrl", ""),
+                "thumbnail": f"/api/proxy-image?url={quote(tt_thumb, safe='')}" if tt_thumb else "",
+                "thumbnail_raw": tt_thumb,
                 "media_url": media.get("mediaUrl", ""),
                 "media_type": media.get("type", "image"),
                 "headline": content.get("title") or content.get("ctaDescription") or "",
@@ -1343,19 +1396,34 @@ async def trendtrack_top_ads(
                 "estimated_spend": metrics.get("estimatedSpend", 0),
                 "duplicates": metrics.get("duplicates", 0),
                 "first_seen": ad.get("firstSeenAt", ""),
-                "facebook_page_id": brand.get("facebookPageId", ""),
+                "facebook_page_id": advertiser.get("facebookPageId", ""),
             })
-        return {
-            "ads": ads,
-            "credits_remaining": r.headers.get("X-Credits-Remaining", "?"),
-            "credits_used": r.headers.get("X-Credits-Used", "?"),
-            "period": period,
-            "media_type": media_type,
-        }
-    except requests.exceptions.HTTPError as e:
-        raise HTTPException(e.response.status_code, f"TrendTrack error: {e.response.text[:200]}")
+
+    return {
+        "ads": all_ads,
+        "credits_remaining": credits_remaining,
+        "period": period,
+        "media_type": media_type,
+        "brands_count": len(TARGET_BRANDS),
+        "per_brand_cap": per_brand_cap,
+    }
+
+
+@app.get("/api/proxy-image")
+async def proxy_image(url: str):
+    """Proxy external images to bypass CORS / hotlink restrictions."""
+    try:
+        r = requests.get(url, timeout=10, stream=True, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        })
+        r.raise_for_status()
+        content_type = r.headers.get("content-type", "image/jpeg")
+        from fastapi.responses import Response
+        return Response(content=r.content, media_type=content_type, headers={
+            "Cache-Control": "public, max-age=86400"
+        })
     except Exception as e:
-        raise HTTPException(500, f"TrendTrack request failed: {str(e)}")
+        raise HTTPException(404, f"Image fetch failed: {e}")
 
 
 def _get_meta_token() -> str:
