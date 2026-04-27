@@ -2638,7 +2638,7 @@ function renderTrending(el) {
     </div>
 
     <!-- ===== MNG INTERNAL — MES TOP STATICS 7J ===== -->
-    <div class="card" style="margin-bottom:32px;background:linear-gradient(135deg,#fff,#fef9f0);border:2px solid #F9F784;">
+    <div class="card" style="margin-bottom:32px;background:linear-gradient(135deg,rgba(167,139,250,.08),rgba(249,247,132,.06));border:1px solid rgba(249,247,132,.25);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
         <div>
           <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">⚡ TES TOP CRÉAS — 7 derniers jours</div>
@@ -2814,60 +2814,60 @@ async function loadMyTopAds() {
     };
     container.innerHTML = `
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
-        <div style="text-align:center;padding:14px;background:rgba(34,197,94,0.08);border-radius:10px;">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">Spend 7j</div>
-          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.total_spend_7d}€</div>
+        <div style="text-align:center;padding:14px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.25);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text2);font-weight:600;">Spend 7j</div>
+          <div style="font-size:22px;font-weight:700;color:var(--green);margin-top:4px;">${res.total_spend_7d}€</div>
         </div>
-        <div style="text-align:center;padding:14px;background:rgba(118,67,222,0.08);border-radius:10px;">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">Achats 7j</div>
-          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.total_purchases_7d}</div>
+        <div style="text-align:center;padding:14px;background:rgba(167,139,250,0.12);border:1px solid rgba(167,139,250,0.25);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text2);font-weight:600;">Achats 7j</div>
+          <div style="font-size:22px;font-weight:700;color:var(--accent-solid);margin-top:4px;">${res.total_purchases_7d}</div>
         </div>
-        <div style="text-align:center;padding:14px;background:rgba(34,197,94,0.08);border-radius:10px;">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">CPA moyen</div>
-          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.total_purchases_7d > 0 ? (res.total_spend_7d / res.total_purchases_7d).toFixed(1) : '—'}€</div>
+        <div style="text-align:center;padding:14px;background:rgba(249,247,132,0.10);border:1px solid rgba(249,247,132,0.30);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text2);font-weight:600;">CPA moyen</div>
+          <div style="font-size:22px;font-weight:700;color:var(--accent-yellow);margin-top:4px;">${res.total_purchases_7d > 0 ? (res.total_spend_7d / res.total_purchases_7d).toFixed(1) : '—'}€</div>
         </div>
-        <div style="text-align:center;padding:14px;background:rgba(245,158,11,0.08);border-radius:10px;">
-          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">À itérer</div>
-          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.iterate.length}</div>
+        <div style="text-align:center;padding:14px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text2);font-weight:600;">À itérer</div>
+          <div style="font-size:22px;font-weight:700;color:var(--orange);margin-top:4px;">${res.iterate.length}</div>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;">
         ${ads.slice(0, 12).map(ad => `
-          <div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:white;display:grid;grid-template-columns:140px 1fr;gap:16px;">
+          <div style="border:1px solid var(--glass-border);border-radius:12px;padding:16px;background:var(--glass);backdrop-filter:var(--blur);display:grid;grid-template-columns:140px 1fr;gap:16px;">
             <div style="aspect-ratio:1/1;background:#f4f4f8;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;" onclick="if('${ad.thumbnail}')window.open('${ad.thumbnail}','_blank')">
               ${ad.thumbnail ? `<img src="${ad.thumbnail}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.opacity='0.3'">` : `<div style="text-align:center;color:var(--text-muted);font-size:11px;padding:8px;">📷<br>Pas de preview<br><span style="font-size:9px;">(sync Meta requis)</span></div>`}
             </div>
-            <div>
+            <div style="color:var(--text);">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
               <div style="flex:1;min-width:0;">
-                <div style="font-weight:600;font-size:14px;margin-bottom:4px;word-break:break-word;">${ad.name}</div>
-                <div style="font-size:11px;color:var(--text-muted);">${ad.adset || ''}</div>
+                <div style="font-weight:600;font-size:14px;margin-bottom:4px;word-break:break-word;color:var(--text);">${ad.name}</div>
+                <div style="font-size:11px;color:var(--text2);">${ad.adset || ''}</div>
               </div>
               <span style="background:${verdictColor[ad.verdict]||'#999'};color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">
                 ${verdictEmoji[ad.verdict]||''} ${ad.verdict}
               </span>
             </div>
-            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;margin-bottom:12px;padding:10px;background:#fafafa;border-radius:8px;">
-              <div><strong>${ad.spend}€</strong><div style="color:var(--text-muted);font-size:10px;">spend</div></div>
-              <div><strong>${ad.purchases}</strong><div style="color:var(--text-muted);font-size:10px;">achats</div></div>
-              <div><strong>${ad.cpa !== null ? ad.cpa+'€' : '—'}</strong><div style="color:var(--text-muted);font-size:10px;">CPA</div></div>
-              <div><strong>${ad.roas}x</strong><div style="color:var(--text-muted);font-size:10px;">ROAS</div></div>
-              <div><strong>${ad.ctr}%</strong><div style="color:var(--text-muted);font-size:10px;">CTR</div></div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;margin-bottom:12px;padding:10px;background:rgba(0,0,0,0.25);border-radius:8px;color:var(--text);">
+              <div><strong>${ad.spend}€</strong><div style="color:var(--text3);font-size:10px;">spend</div></div>
+              <div><strong>${ad.purchases}</strong><div style="color:var(--text3);font-size:10px;">achats</div></div>
+              <div><strong>${ad.cpa !== null ? ad.cpa+'€' : '—'}</strong><div style="color:var(--text3);font-size:10px;">CPA</div></div>
+              <div><strong>${ad.roas}x</strong><div style="color:var(--text3);font-size:10px;">ROAS</div></div>
+              <div><strong>${ad.ctr}%</strong><div style="color:var(--text3);font-size:10px;">CTR</div></div>
             </div>
             ${ad.iterations && ad.iterations.length > 0 ? `
               <details style="margin-top:8px;">
-                <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);padding:6px 0;">
+                <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent-solid);padding:6px 0;">
                   💡 ${ad.iterations.length} idée${ad.iterations.length>1?'s':''} d'itération Andromeda-safe
                 </summary>
                 <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
                   ${ad.iterations.map(it => `
-                    <div style="border-left:3px solid ${it.priority==='critical'?'#ef4444':it.priority==='high'?'#f59e0b':'#7643DE'};padding:8px 12px;background:#fafafa;border-radius:0 8px 8px 0;">
-                      <div style="font-size:12px;font-weight:600;margin-bottom:3px;">
+                    <div style="border-left:3px solid ${it.priority==='critical'?'#ef4444':it.priority==='high'?'#f59e0b':'#a78bfa'};padding:8px 12px;background:rgba(0,0,0,0.25);border-radius:0 8px 8px 0;">
+                      <div style="font-size:12px;font-weight:600;margin-bottom:3px;color:var(--text);">
                         ${it.title}
-                        <span style="font-size:10px;background:${it.priority==='critical'?'#ef4444':it.priority==='high'?'#f59e0b':'#7643DE'};color:white;padding:1px 6px;border-radius:8px;margin-left:6px;">${it.priority}</span>
+                        <span style="font-size:10px;background:${it.priority==='critical'?'#ef4444':it.priority==='high'?'#f59e0b':'#a78bfa'};color:white;padding:1px 6px;border-radius:8px;margin-left:6px;">${it.priority}</span>
                       </div>
-                      <div style="font-size:11px;color:var(--text-muted);line-height:1.4;margin-bottom:4px;">${it.rationale}</div>
-                      <div style="font-size:11px;color:#0a0a0f;line-height:1.4;"><strong>→</strong> ${it.action}</div>
+                      <div style="font-size:11px;color:var(--text2);line-height:1.4;margin-bottom:4px;">${it.rationale}</div>
+                      <div style="font-size:11px;color:var(--text);line-height:1.4;"><strong>→</strong> ${it.action}</div>
                       <button class="btn btn-primary" style="margin-top:6px;font-size:10px;padding:5px 12px;" onclick="navigateToGenerateWithIteration('${(ad.name||'').replace(/'/g,'')}', '${it.type}', '${(it.action||'').replace(/'/g,'').slice(0,80)}', '${ad.thumbnail||''}')">⚡ Générer cette itération</button>
                     </div>
                   `).join('')}
@@ -3028,7 +3028,7 @@ function openTrendingDetail(adId) {
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;cursor:pointer;';
   modal.onclick = () => modal.remove();
   modal.innerHTML = `
-    <div style="background:white;border-radius:16px;max-width:600px;width:100%;max-height:90vh;overflow:auto;cursor:default;" onclick="event.stopPropagation();">
+    <div style="background:var(--bg2);border:1px solid var(--glass-border);border-radius:16px;max-width:600px;width:100%;max-height:90vh;overflow:auto;cursor:default;color:var(--text);" onclick="event.stopPropagation();">
       <img src="${ad.thumbnail}" style="width:100%;border-radius:16px 16px 0 0;">
       <div style="padding:24px;">
         <h2 style="font-family:var(--font-serif);font-size:24px;margin-bottom:8px;">${ad.brand_name}</h2>
