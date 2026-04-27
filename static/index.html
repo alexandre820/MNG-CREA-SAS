@@ -2586,7 +2586,28 @@ function renderTrending(el) {
     <div class="page-header">
       <div>
         <h1>Top Créas <em>de la semaine</em></h1>
-        <p>Les statics qui ont explosé chez les concurrents — données live TrendTrack</p>
+        <p>Tes winners + ce qui pète chez les concurrents — données live</p>
+      </div>
+    </div>
+
+    <!-- ===== MNG INTERNAL — MES TOP STATICS 7J ===== -->
+    <div class="card" style="margin-bottom:32px;background:linear-gradient(135deg,#fff,#fef9f0);border:2px solid #F9F784;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:1.5px;">⚡ TES TOP CRÉAS — 7 derniers jours</div>
+          <h2 style="font-family:var(--font-serif);font-size:24px;margin-top:4px;">Mes statics gagnants</h2>
+        </div>
+        <button class="btn btn-secondary" onclick="loadMyTopAds()" id="my-ads-refresh">🔄 Refresh</button>
+      </div>
+      <div id="my-top-ads-container">
+        <div style="text-align:center;padding:40px;color:var(--text-muted);">Chargement...</div>
+      </div>
+    </div>
+
+    <!-- ===== TRENDTRACK — CONCURRENTS ===== -->
+    <div class="page-header" style="border:none;margin:-32px 0 16px;padding:0;">
+      <div>
+        <h2 style="font-family:var(--font-serif);font-size:22px;">📊 Top créas <em>concurrents</em></h2>
       </div>
       <div style="display:flex;gap:8px;align-items:center;">
         <span style="font-size:12px;color:var(--text-muted);">Crédits TT: <strong>${t.credits}</strong></span>
@@ -2671,6 +2692,110 @@ function renderTrending(el) {
   if (t.ads.length === 0 && !t.loading) {
     loadTrendingAds();
   }
+  // Load my top ads on first render too
+  loadMyTopAds();
+}
+
+async function loadMyTopAds() {
+  const container = document.getElementById('my-top-ads-container');
+  if (!container) return;
+  try {
+    const res = await api('/api/my-top-ads');
+    if (res.error) {
+      container.innerHTML = `<div style="text-align:center;padding:30px;color:#ef4444;">⚠️ ${res.error}</div>`;
+      return;
+    }
+    const ads = res.ads || [];
+    if (ads.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">Aucune donnée. Lance Ad Doctor pour pull les data.</div>';
+      return;
+    }
+    const verdictColor = {
+      'SCALE': '#22c55e', 'WINNER': '#22c55e',
+      'WATCH': '#3b82f6',
+      'ITERATE': '#f59e0b',
+      'KILL': '#ef4444'
+    };
+    const verdictEmoji = {
+      'SCALE': '🚀', 'WINNER': '⭐', 'WATCH': '👀', 'ITERATE': '🔄', 'KILL': '☠️'
+    };
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div style="text-align:center;padding:14px;background:rgba(34,197,94,0.08);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">Spend 7j</div>
+          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.total_spend_7d}€</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:rgba(118,67,222,0.08);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">Achats 7j</div>
+          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.total_purchases_7d}</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:rgba(34,197,94,0.08);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">CPA moyen</div>
+          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.total_purchases_7d > 0 ? (res.total_spend_7d / res.total_purchases_7d).toFixed(1) : '—'}€</div>
+        </div>
+        <div style="text-align:center;padding:14px;background:rgba(245,158,11,0.08);border-radius:10px;">
+          <div style="font-size:11px;color:var(--text-muted);font-weight:600;">À itérer</div>
+          <div style="font-size:22px;font-weight:700;color:#0a0a0f;margin-top:4px;">${res.iterate.length}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${ads.slice(0, 12).map(ad => `
+          <div style="border:1px solid var(--border);border-radius:12px;padding:16px;background:white;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;">
+              <div style="flex:1;">
+                <div style="font-weight:600;font-size:14px;margin-bottom:4px;">${ad.name}</div>
+                <div style="font-size:11px;color:var(--text-muted);">${ad.adset || ''}</div>
+              </div>
+              <span style="background:${verdictColor[ad.verdict]||'#999'};color:white;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;">
+                ${verdictEmoji[ad.verdict]||''} ${ad.verdict}
+              </span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:12px;margin-bottom:12px;padding:10px;background:#fafafa;border-radius:8px;">
+              <div><strong>${ad.spend}€</strong><div style="color:var(--text-muted);font-size:10px;">spend</div></div>
+              <div><strong>${ad.purchases}</strong><div style="color:var(--text-muted);font-size:10px;">achats</div></div>
+              <div><strong>${ad.cpa !== null ? ad.cpa+'€' : '—'}</strong><div style="color:var(--text-muted);font-size:10px;">CPA</div></div>
+              <div><strong>${ad.roas}x</strong><div style="color:var(--text-muted);font-size:10px;">ROAS</div></div>
+              <div><strong>${ad.ctr}%</strong><div style="color:var(--text-muted);font-size:10px;">CTR</div></div>
+            </div>
+            ${ad.iterations && ad.iterations.length > 0 ? `
+              <details style="margin-top:8px;">
+                <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--accent);padding:6px 0;">
+                  💡 ${ad.iterations.length} idée${ad.iterations.length>1?'s':''} d'itération Andromeda-safe
+                </summary>
+                <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+                  ${ad.iterations.map(it => `
+                    <div style="border-left:3px solid ${it.priority==='critical'?'#ef4444':it.priority==='high'?'#f59e0b':'#7643DE'};padding:8px 12px;background:#fafafa;border-radius:0 8px 8px 0;">
+                      <div style="font-size:12px;font-weight:600;margin-bottom:3px;">
+                        ${it.title}
+                        <span style="font-size:10px;background:${it.priority==='critical'?'#ef4444':it.priority==='high'?'#f59e0b':'#7643DE'};color:white;padding:1px 6px;border-radius:8px;margin-left:6px;">${it.priority}</span>
+                      </div>
+                      <div style="font-size:11px;color:var(--text-muted);line-height:1.4;margin-bottom:4px;">${it.rationale}</div>
+                      <div style="font-size:11px;color:#0a0a0f;line-height:1.4;"><strong>→</strong> ${it.action}</div>
+                      <button class="btn btn-secondary" style="margin-top:6px;font-size:10px;padding:4px 10px;" onclick="navigateToGenerateWithIteration('${(ad.name||'').replace(/'/g,'')}', '${it.type}', '${(it.action||'').replace(/'/g,'').slice(0,80)}')">⚡ Générer cette itération</button>
+                    </div>
+                  `).join('')}
+                </div>
+              </details>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div style="padding:20px;color:#ef4444;">Erreur : ${e.message}</div>`;
+  }
+}
+
+function navigateToGenerateWithIteration(adName, iterationType, action) {
+  state.iterationContext = { adName, iterationType, action };
+  navigate('generate');
+  setTimeout(() => {
+    const angleInput = document.getElementById('angle-input');
+    if (angleInput) {
+      angleInput.value = `Itération de "${adName.slice(0,40)}" : ${action}`;
+      angleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 200);
 }
 
 async function loadTrendingAds() {

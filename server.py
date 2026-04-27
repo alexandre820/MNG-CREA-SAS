@@ -1255,6 +1255,171 @@ async def trendtrack_top_ads(
         raise HTTPException(500, f"TrendTrack request failed: {str(e)}")
 
 
+@app.get("/api/my-top-ads")
+async def my_top_ads():
+    """
+    Pull MNG's own top static ads from last 7 days (via Ad Doctor data),
+    enrichi avec recommandations d'itération Andromeda-safe.
+    """
+    data_path = DATA_DIR / "mng_top_7d.json"
+    if not data_path.exists():
+        return {"ads": [], "error": "Data not available. Run Ad Doctor first."}
+
+    try:
+        ads = json.loads(data_path.read_text())
+    except Exception as e:
+        return {"ads": [], "error": f"Failed to load data: {e}"}
+
+    # Filter statics only (S_ prefix or no V_ prefix), enrich with iteration ideas
+    enriched = []
+    for ad in ads:
+        name = (ad.get("ad_name") or "").lower()
+        # Detect static vs video
+        is_static = name.startswith("s_") or "16/02 s_" in name or (
+            not name.startswith("v_") and "_facecam" not in name and "broll" not in name
+        )
+        # Generate Andromeda-safe iteration recommendations based on verdict
+        verdict = ad.get("verdict", "WATCH")
+        cpa = ad.get("cpa", 0) or 0
+        purchases = ad.get("purchases", 0)
+        spend = ad.get("spend", 0)
+
+        iterations = build_andromeda_iterations(ad, is_static)
+
+        enriched.append({
+            "ad_id": ad.get("ad_id"),
+            "name": ad.get("ad_name", "?"),
+            "campaign": ad.get("campaign_name", ""),
+            "adset": ad.get("adset_name", ""),
+            "spend": round(spend, 2),
+            "purchases": purchases,
+            "cpa": round(cpa, 2) if cpa and cpa != float('inf') else None,
+            "roas": round(ad.get("roas", 0) or 0, 2),
+            "ctr": round(ad.get("ctr", 0) or 0, 2),
+            "hook_rate": round(ad.get("hook_rate", 0) or 0, 1),
+            "frequency": round(ad.get("frequency", 0) or 0, 2),
+            "verdict": verdict,
+            "verdict_reason": ad.get("verdict_reason", ""),
+            "iteration_level": ad.get("iteration_level", 0),
+            "is_static": is_static,
+            "iterations": iterations,
+        })
+
+    return {
+        "ads": enriched,
+        "total_spend_7d": round(sum(a["spend"] for a in enriched), 2),
+        "total_purchases_7d": sum(a["purchases"] for a in enriched),
+        "winners": [a for a in enriched if a["verdict"] in ("SCALE", "WINNER")],
+        "watch": [a for a in enriched if a["verdict"] == "WATCH"],
+        "iterate": [a for a in enriched if a["verdict"] == "ITERATE"],
+        "kill": [a for a in enriched if a["verdict"] == "KILL"],
+    }
+
+
+def build_andromeda_iterations(ad: dict, is_static: bool) -> list[dict]:
+    """
+    Génère des recommandations d'itération Andromeda-safe.
+    Règles Andromeda :
+    - Pas de duplicate (nouvelle entité créa, pas juste edit metadata)
+    - Composition visuelle différente (pas même image avec texte changé)
+    - Hook/angle différent (pas reformulation)
+    - Format différent si possible
+    - Signal d'audience différent (persona)
+    """
+    name = (ad.get("ad_name") or "").lower()
+    verdict = ad.get("verdict", "WATCH")
+    cpa = ad.get("cpa", 0) or 0
+    hook_rate = ad.get("hook_rate", 0) or 0
+    ctr = ad.get("ctr", 0) or 0
+
+    # Detect angle from name
+    angle = "ballonnements"
+    if "intestin" in name: angle = "intestin"
+    elif "stress" in name or "anxiete" in name: angle = "stress"
+    elif "focus" in name: angle = "focus"
+    elif "energie" in name or "crash" in name: angle = "crash_energie"
+    elif "ventre" in name or "douleur" in name: angle = "douleur_ventre"
+
+    iterations = []
+
+    # If WINNER/SCALE → multiply (but Andromeda-safe = different format/persona)
+    if verdict in ("SCALE", "WINNER"):
+        iterations.append({
+            "type": "format_pivot",
+            "priority": "high",
+            "title": "Pivot format 9:16 → 4:5",
+            "rationale": f"Cette créa cartonne (CPA {cpa}€). Le 4:5 capte le scroll feed Instagram. Andromeda-safe car nouveau ratio = nouvelle entité.",
+            "action": f"Recréer en 4:5 avec MÊME angle '{angle}' mais composition adaptée (carré, élément visuel central plus large)",
+        })
+        iterations.append({
+            "type": "persona_shift",
+            "priority": "high",
+            "title": "Persona shift",
+            "rationale": "Andromeda-safe : cibler une nouvelle audience donne signal différent à l'algo.",
+            "action": "Décliner le hook gagnant pour persona DIFFÉRENT (ex: si actuelle = mère active, créer version entrepreneur 30-40)",
+        })
+
+    # If ITERATE → real iteration, pas duplicate
+    elif verdict == "ITERATE":
+        if hook_rate < 30:
+            iterations.append({
+                "type": "hook_overhaul",
+                "priority": "critical",
+                "title": "Hook rate faible — refonte hook",
+                "rationale": f"Hook rate {hook_rate}% trop bas. Pas un problème de copy mais d'attention. Nouveau pattern interrupt = nouvelle entité créa.",
+                "action": "Tester un VISUEL choquant en 1ère seconde (avant/après, close-up, texte géant). Garder le body.",
+            })
+        if ctr < 1.0:
+            iterations.append({
+                "type": "cta_punch",
+                "priority": "high",
+                "title": "CTR faible — punch final",
+                "rationale": f"CTR {ctr}%. Le hook capte mais ne convertit pas en clic. Repenser le CTA.",
+                "action": "Ajouter urgence visuelle (compteur, prix barré, badge -X%) dans les 3 dernières secondes",
+            })
+        iterations.append({
+            "type": "angle_pivot",
+            "priority": "medium",
+            "title": "Pivot angle (test latéral)",
+            "rationale": f"Angle actuel '{angle}' a du potentiel. Tester une variation angle adjacent pour ouvrir une nouvelle audience.",
+            "action": _angle_pivot_recommendation(angle),
+        })
+
+    # If KILL → don't iterate, replace with NEW concept
+    elif verdict == "KILL":
+        iterations.append({
+            "type": "replace",
+            "priority": "high",
+            "title": "Ne PAS itérer — remplacer",
+            "rationale": f"CPA {cpa}€ trop élevé. Itérer = perdre du budget. Concept à abandonner.",
+            "action": f"Lancer un concept ENTIÈREMENT NEW (autre angle, autre format, autre persona). Ne pas réutiliser ce hook.",
+        })
+
+    # Universal recommendation if static
+    if is_static and verdict != "KILL":
+        iterations.append({
+            "type": "static_volume",
+            "priority": "medium",
+            "title": "Volume de variations",
+            "rationale": "Static qui marche = créer 5-10 variations visuelles du même hook (RYZE pattern). Andromeda apprécie volume si hook constant.",
+            "action": "Faire 5 variations : (1) couleur fond, (2) photo produit, (3) layout, (4) typo, (5) trust badges position",
+        })
+
+    return iterations
+
+
+def _angle_pivot_recommendation(current_angle: str) -> str:
+    pivots = {
+        "ballonnements": "Tester angle 'intestin-cerveau' (nouveau) ou 'ventre plat sans régime' (latéral)",
+        "intestin": "Tester angle 'digestion lente' ou 'transit' (latéral même pain)",
+        "stress": "Tester angle 'sommeil' ou 'fatigue mentale' (chaîne causale)",
+        "focus": "Tester angle 'productivité' ou 'fatigue cognitive' (latéral)",
+        "crash_energie": "Tester angle '14h crash' (spécifique) ou '4ème café' (situationnel)",
+        "douleur_ventre": "Tester angle 'inconfort post-repas' ou 'spasmes' (variation pain)",
+    }
+    return pivots.get(current_angle, "Tester un angle latéral même persona, même pain mais formulé différemment")
+
+
 @app.get("/api/trendtrack/usage")
 async def trendtrack_usage():
     """Get TrendTrack credit balance."""
