@@ -1485,19 +1485,27 @@ async def my_top_ads():
 
 def build_andromeda_iterations(ad: dict, is_static: bool) -> list[dict]:
     """
-    Génère des recommandations d'itération Andromeda-safe.
-    Règles Andromeda :
-    - Pas de duplicate (nouvelle entité créa, pas juste edit metadata)
-    - Composition visuelle différente (pas même image avec texte changé)
-    - Hook/angle différent (pas reformulation)
-    - Format différent si possible
-    - Signal d'audience différent (persona)
+    Génère des recommandations Andromeda-safe basées sur les VRAIES règles MNG.
+
+    Seuils MNG (config Ad Doctor) :
+    - cpa_target: 27€ · cpa_breakeven: 37€ · cpa_kill: 45€
+    - freq_scale_max: 2.5 · freq_iterate: 2.8 · freq_kill: 3.5
+    - min_purchases_scale: 10 · min_purchases_decision: 5
+
+    Niveaux d'itération (du classifier) :
+    - Niveau 1 (hook_rate < 15%) → nouveau hook
+    - Niveau 2 (hook_rate ok mais freq monte) → nouveau visuel
+    - Niveau 3 (freq > 3.2) → nouvel angle/concept
     """
     name = (ad.get("ad_name") or "").lower()
     verdict = ad.get("verdict", "WATCH")
+    iter_level = ad.get("iteration_level", "")
     cpa = ad.get("cpa", 0) or 0
     hook_rate = ad.get("hook_rate", 0) or 0
     ctr = ad.get("ctr", 0) or 0
+    frequency = ad.get("frequency", 0) or 0
+    purchases = ad.get("purchases", 0) or 0
+    spend = ad.get("spend", 0) or 0
 
     # Detect angle from name
     angle = "ballonnements"
@@ -1509,68 +1517,112 @@ def build_andromeda_iterations(ad: dict, is_static: bool) -> list[dict]:
 
     iterations = []
 
-    # If WINNER/SCALE → multiply (but Andromeda-safe = different format/persona)
-    if verdict in ("SCALE", "WINNER"):
+    # ==================== SCALE ====================
+    # Règle: cpa < 27€ + purchases >= 10 + freq < 2.5
+    if verdict == "SCALE":
         iterations.append({
-            "type": "format_pivot",
-            "priority": "high",
-            "title": "Pivot format 9:16 → 4:5",
-            "rationale": f"Cette créa cartonne (CPA {cpa}€). Le 4:5 capte le scroll feed Instagram. Andromeda-safe car nouveau ratio = nouvelle entité.",
-            "action": f"Recréer en 4:5 avec MÊME angle '{angle}' mais composition adaptée (carré, élément visuel central plus large)",
+            "type": "scale_budget",
+            "priority": "critical",
+            "title": "🚀 SCALE — augmenter le budget",
+            "rationale": f"CPA {cpa}€ < target 27€, {purchases} achats, freq {frequency} sous saturation. C'est un winner confirmé.",
+            "action": "Monter budget adset +20-30% par jour. Surveiller freq — si dépasse 2.5, pause scaling.",
         })
         iterations.append({
-            "type": "persona_shift",
+            "type": "format_pivot_andromeda",
             "priority": "high",
-            "title": "Persona shift",
-            "rationale": "Andromeda-safe : cibler une nouvelle audience donne signal différent à l'algo.",
-            "action": "Décliner le hook gagnant pour persona DIFFÉRENT (ex: si actuelle = mère active, créer version entrepreneur 30-40)",
+            "title": "Format pivot (Andromeda-safe)",
+            "rationale": "Pour multiplier sans cannibaliser : nouveau ratio = nouvelle entité créa pour Andromeda.",
+            "action": f"Recréer en autre format (4:5 → 9:16 ou 1:1). MÊME angle '{angle}', composition adaptée au ratio.",
+        })
+        iterations.append({
+            "type": "persona_widening",
+            "priority": "medium",
+            "title": "Élargir l'audience",
+            "rationale": "Adset actuel performe — tester en CBO ou audience plus large pour scale sans saturer.",
+            "action": "Dupliquer l'adset avec audience +30% large (LAL 5%, intérêts adjacents)",
         })
 
-    # If ITERATE → real iteration, pas duplicate
+    # ==================== ITERATE ====================
+    # Règle: cpa <= 45€ + freq entre 2.8 et 3.5 (fatigue imminente)
     elif verdict == "ITERATE":
-        if hook_rate < 30:
+        # Niveau 3 — Freq > 3.2 → nouvel angle
+        if frequency > 3.2:
             iterations.append({
-                "type": "hook_overhaul",
+                "type": "iter_level_3",
                 "priority": "critical",
-                "title": "Hook rate faible — refonte hook",
-                "rationale": f"Hook rate {hook_rate}% trop bas. Pas un problème de copy mais d'attention. Nouveau pattern interrupt = nouvelle entité créa.",
-                "action": "Tester un VISUEL choquant en 1ère seconde (avant/après, close-up, texte géant). Garder le body.",
+                "title": "🔄 Niveau 3 — Nouvel angle",
+                "rationale": f"Freq {frequency} critique. L'audience a saturé. Ré-itérer = brûler le budget.",
+                "action": _angle_pivot_recommendation(angle),
             })
-        if ctr < 1.0:
+        # Niveau 1 — hook rate faible
+        elif hook_rate < 15:
             iterations.append({
-                "type": "cta_punch",
-                "priority": "high",
-                "title": "CTR faible — punch final",
-                "rationale": f"CTR {ctr}%. Le hook capte mais ne convertit pas en clic. Repenser le CTA.",
-                "action": "Ajouter urgence visuelle (compteur, prix barré, badge -X%) dans les 3 dernières secondes",
+                "type": "iter_level_1",
+                "priority": "critical",
+                "title": "🪝 Niveau 1 — Nouveau hook",
+                "rationale": f"Hook rate {hook_rate}% < 15%. Le contenu est bon mais l'attention pas captée.",
+                "action": "Garder le body/CTA. Refaire UNIQUEMENT la 1ère seconde avec un pattern interrupt (close-up, texte géant, son inattendu).",
             })
-        iterations.append({
-            "type": "angle_pivot",
-            "priority": "medium",
-            "title": "Pivot angle (test latéral)",
-            "rationale": f"Angle actuel '{angle}' a du potentiel. Tester une variation angle adjacent pour ouvrir une nouvelle audience.",
-            "action": _angle_pivot_recommendation(angle),
-        })
+        # Niveau 2 — visuel à varier
+        else:
+            iterations.append({
+                "type": "iter_level_2",
+                "priority": "high",
+                "title": "🎨 Niveau 2 — Nouveau visuel",
+                "rationale": f"Freq {frequency} en hausse, hook ok ({hook_rate}%). Varier le visuel = nouvelle entité Andromeda.",
+                "action": "Garder hook + script. Changer fond, couleurs, layout, ou décor. Andromeda voit ça comme nouvelle créa.",
+            })
 
-    # If KILL → don't iterate, replace with NEW concept
+    # ==================== KILL ====================
+    # Règle: cpa > 45€ OU 0 achat à 75€+ OU freq > 3.5
     elif verdict == "KILL":
+        if frequency > 3.5:
+            kill_reason = f"Freq {frequency} > 3.5 — audience cramée"
+            kill_action = "Pause cette ad. Si l'angle marchait avant, reprendre dans 30j avec nouveau visuel ET nouvelle audience."
+        elif cpa > 45 and cpa != float('inf'):
+            kill_reason = f"CPA {cpa}€ > kill 45€"
+            kill_action = "Pause. Le concept ne convertit pas — pas d'itération, partir sur un autre angle."
+        else:
+            kill_reason = f"{spend:.0f}€ dépensés, 0 achat"
+            kill_action = "Pause direct. Pas d'audience trouvée — concept mort."
+
         iterations.append({
-            "type": "replace",
-            "priority": "high",
-            "title": "Ne PAS itérer — remplacer",
-            "rationale": f"CPA {cpa}€ trop élevé. Itérer = perdre du budget. Concept à abandonner.",
-            "action": f"Lancer un concept ENTIÈREMENT NEW (autre angle, autre format, autre persona). Ne pas réutiliser ce hook.",
+            "type": "kill_pause",
+            "priority": "critical",
+            "title": "☠️ KILL — pause immédiate",
+            "rationale": kill_reason,
+            "action": kill_action,
         })
 
-    # Universal recommendation if static
-    if is_static and verdict != "KILL":
-        iterations.append({
-            "type": "static_volume",
-            "priority": "medium",
-            "title": "Volume de variations",
-            "rationale": "Static qui marche = créer 5-10 variations visuelles du même hook (RYZE pattern). Andromeda apprécie volume si hook constant.",
-            "action": "Faire 5 variations : (1) couleur fond, (2) photo produit, (3) layout, (4) typo, (5) trust badges position",
-        })
+    # ==================== WATCH ====================
+    # Règle: zone grise — pas assez de data ou metrics entre target/kill
+    else:  # WATCH
+        # Règle d'or absolue : pas de décision tant que pas assez de data
+        if spend < 75 and purchases == 0:
+            iterations.append({
+                "type": "watch_no_data",
+                "priority": "low",
+                "title": "⏳ Attendre — règle 75€",
+                "rationale": f"{spend:.0f}€ dépensés, 0 achat. Règle MNG : attendre 75€ avant kill si 0 vente.",
+                "action": f"Continuer à laisser tourner jusqu'à 75€ ou 1ère vente. Ne PAS itérer maintenant — pas assez de data.",
+            })
+        elif purchases > 0 and purchases < 5:
+            iterations.append({
+                "type": "watch_pre_decision",
+                "priority": "low",
+                "title": "⏳ Attendre 5 ventes",
+                "rationale": f"{purchases} ventes. Règle MNG : attendre 5 ventes minimum avant toute décision.",
+                "action": "Laisser tourner. CPA actuel pas représentatif tant que < 5 conversions.",
+            })
+        elif cpa != float('inf') and 27 <= cpa <= 45:
+            # Zone grise breakeven
+            iterations.append({
+                "type": "watch_grey_zone",
+                "priority": "medium",
+                "title": "🤔 Zone grise — surveiller",
+                "rationale": f"CPA {cpa}€ entre target (27€) et kill (45€). Pas assez bon pour scale, pas assez mauvais pour kill.",
+                "action": f"Si freq < 2.8 : laisser maturer 3-5j. Si freq monte vers 2.8 : pré-itérer (Niveau 2 visuel) avant fatigue.",
+            })
 
     return iterations
 

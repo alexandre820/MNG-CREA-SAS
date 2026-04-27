@@ -3176,12 +3176,37 @@ function addSuggestedTag(containerId, value) {
   if (!container) return;
   // Check if tag already exists
   const existing = getTags(containerId);
-  if (existing.includes(value)) return;
+  if (existing.includes(value)) {
+    // Visual feedback that it's already there
+    const tags = container.querySelectorAll('.tag');
+    tags.forEach(t => {
+      if (t.textContent.replace('×','').trim() === value) {
+        t.style.transition = 'background 0.3s';
+        const orig = t.style.background;
+        t.style.background = '#fbbf24';
+        setTimeout(() => { t.style.background = orig; }, 600);
+      }
+    });
+    return;
+  }
   const input = container.querySelector('input');
   const tag = document.createElement('span');
   tag.className = 'tag';
   tag.innerHTML = `${value} <button onclick="this.parentElement.remove()">&times;</button>`;
+  // Animate insertion
+  tag.style.opacity = '0';
+  tag.style.transform = 'scale(0.8)';
   container.insertBefore(tag, input);
+  requestAnimationFrame(() => {
+    tag.style.transition = 'opacity 0.2s, transform 0.2s';
+    tag.style.opacity = '1';
+    tag.style.transform = 'scale(1)';
+  });
+  // Auto-save strategy after click
+  if (typeof saveStrategy === 'function' && (containerId === 'strat-pains' || containerId === 'strat-desires' || containerId === 'strat-offers')) {
+    clearTimeout(window._stratSaveTimeout);
+    window._stratSaveTimeout = setTimeout(() => saveStrategy(), 500);
+  }
 }
 
 function toggleCompetitorForm() {
