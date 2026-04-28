@@ -126,6 +126,20 @@ def bootstrap_seed_data():
             except Exception as e:
                 print(f"[seed] failed to copy uploads: {e}")
 
+    # Copy thumb_cache (downloaded competitor + MNG thumbnails)
+    thumb_dir = DATA_DIR / "thumb_cache"
+    seed_thumbs = seed_dir / "thumb_cache"
+    if seed_thumbs.exists():
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        existing = list(thumb_dir.rglob("*"))
+        if len([f for f in existing if f.is_file()]) == 0:
+            try:
+                shutil.copytree(seed_thumbs, thumb_dir, dirs_exist_ok=True)
+                count = sum(1 for f in thumb_dir.rglob("*") if f.is_file())
+                print(f"[seed] copied {count} thumb_cache files")
+            except Exception as e:
+                print(f"[seed] failed to copy thumb_cache: {e}")
+
 
 bootstrap_seed_data()
 
