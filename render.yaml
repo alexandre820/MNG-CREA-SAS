@@ -7,5 +7,14 @@ services:
     envVars:
       - key: FAL_KEY
         sync: false
+      - key: TRENDTRACK_API_KEY
+        sync: false
+      - key: META_ACCESS_TOKEN
+        sync: false
       - key: PYTHON_VERSION
         value: "3.11"
+    # Persistent disk for DB + uploads + outputs (survives redeploys)
+    disk:
+      name: creaflow-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1

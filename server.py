@@ -69,6 +69,68 @@ for d in [DATA_DIR, UPLOADS_DIR, OUTPUTS_DIR]:
 
 
 # ---------------------------------------------------------------------------
+# Seed bootstrap: if data/ is empty (e.g., first boot on Render with persistent
+# disk), copy initial seed data from seed/ folder
+# ---------------------------------------------------------------------------
+def bootstrap_seed_data():
+    """Copy seed files to data/ if they don't exist (first boot)."""
+    import shutil
+    seed_dir = BASE_DIR / "seed"
+    if not seed_dir.exists():
+        return  # No seed data to bootstrap
+
+    # Copy DB if missing
+    if not DB_PATH.exists() and (seed_dir / "creaflow.db").exists():
+        try:
+            shutil.copy2(seed_dir / "creaflow.db", DB_PATH)
+            print(f"[seed] copied creaflow.db ({DB_PATH.stat().st_size} bytes)")
+        except Exception as e:
+            print(f"[seed] failed to copy DB: {e}")
+
+    # Copy mng_top_7d.json if missing
+    top7d_path = DATA_DIR / "mng_top_7d.json"
+    if not top7d_path.exists() and (seed_dir / "mng_top_7d.json").exists():
+        try:
+            shutil.copy2(seed_dir / "mng_top_7d.json", top7d_path)
+            print("[seed] copied mng_top_7d.json")
+        except Exception as e:
+            print(f"[seed] failed to copy mng_top_7d.json: {e}")
+
+    # Copy inspirations if data/inspirations is empty
+    inspo_dir = DATA_DIR / "inspirations"
+    seed_inspo = seed_dir / "inspirations"
+    if seed_inspo.exists():
+        inspo_dir.mkdir(parents=True, exist_ok=True)
+        # Check if dir is effectively empty (no subdirs/files)
+        existing = list(inspo_dir.rglob("*"))
+        if len([f for f in existing if f.is_file()]) == 0:
+            try:
+                # copytree dest must not exist; use shutil.copytree with dirs_exist_ok if Py3.8+
+                shutil.copytree(seed_inspo, inspo_dir, dirs_exist_ok=True)
+                count = sum(1 for f in inspo_dir.rglob("*") if f.is_file())
+                print(f"[seed] copied {count} inspiration files")
+            except Exception as e:
+                print(f"[seed] failed to copy inspirations: {e}")
+
+    # Copy uploads (product packshots) if data/uploads is empty
+    uploads_dir = DATA_DIR / "uploads"
+    seed_uploads = seed_dir / "uploads"
+    if seed_uploads.exists():
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        existing = list(uploads_dir.rglob("*"))
+        if len([f for f in existing if f.is_file()]) == 0:
+            try:
+                shutil.copytree(seed_uploads, uploads_dir, dirs_exist_ok=True)
+                count = sum(1 for f in uploads_dir.rglob("*") if f.is_file())
+                print(f"[seed] copied {count} upload files")
+            except Exception as e:
+                print(f"[seed] failed to copy uploads: {e}")
+
+
+bootstrap_seed_data()
+
+
+# ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
 def get_db():

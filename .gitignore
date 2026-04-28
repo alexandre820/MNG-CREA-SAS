@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
-data/
 .env
-*.db
+# data/ is the runtime directory — populated from seed/ on first boot
+data/
+# But seed/ contains initial bootstrap data and IS committed
+!seed/
