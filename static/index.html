@@ -505,26 +505,26 @@ body {
 /* ---- Generation form ---- */
 .gen-form { max-width: 900px; }
 .form-section {
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.6);
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
-  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin-bottom: 16px;
+  transition: all var(--transition);
   position: relative;
   z-index: 1;
+  color: var(--text);
 }
-.form-section:hover { border-color: rgba(118,67,222,0.2); box-shadow: 0 8px 40px rgba(118,67,222,0.08), 0 2px 8px rgba(0,0,0,0.04); }
+.form-section:hover { border-color: var(--glass-border2); }
 .form-section-title {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: .68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  color: var(--text-muted);
-  margin-bottom: 16px;
+  letter-spacing: 1.4px;
+  color: var(--text2);
+  margin-bottom: 14px;
 }
 .form-row {
   display: flex;
@@ -607,7 +607,7 @@ body {
   flex: 1;
   -webkit-appearance: none;
   height: 6px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  background: var(--accent);
   border-radius: 3px;
   border: none;
   padding: 0;
@@ -618,11 +618,12 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: white;
-  border: 3px solid var(--accent);
+  background: var(--text);
+  border: 3px solid var(--accent-solid);
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(118,67,222,0.3);
+  box-shadow: 0 2px 12px var(--accent-glow);
 }
+.slider-value { color: var(--text); }
 .slider-value {
   font-family: var(--font-serif);
   font-size: 26px;
@@ -674,10 +675,11 @@ body {
   margin-right: -6px;
 }
 .product-card.active {
-  border-color: var(--accent);
-  background: var(--accent-bg);
+  border-color: var(--accent-solid);
+  background: var(--accent-soft);
 }
-.product-card:hover { border-color: var(--accent); cursor: pointer; }
+.product-card:hover { border-color: var(--glass-border3); cursor: pointer; background: var(--glass2); }
+.product-card.active:hover { border-color: var(--accent-solid); }
 .product-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
 .product-images-row {
   display: flex;
@@ -696,34 +698,34 @@ body {
 .gen-bottom-bar {
   position: sticky;
   bottom: 0;
-  margin: 32px -40px -100px;
-  background: rgba(255,255,255,0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid rgba(255,255,255,0.6);
-  padding: 16px 40px;
+  margin: 32px -32px -100px;
+  background: rgba(10,10,15,.85);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-top: 1px solid var(--glass-border2);
+  padding: 14px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   z-index: 100;
+  color: var(--text);
 }
 .gen-summary {
-  font-size: 13px;
-  color: var(--text-secondary);
+  font-size: .82rem;
+  color: var(--text2);
 }
-.gen-summary strong { color: var(--accent); font-size: 15px; }
+.gen-summary strong { color: var(--accent-solid); font-size: .92rem; font-weight: 700; }
 .btn-cta.btn-lg.gen-main-cta {
-  background: linear-gradient(135deg, #0A0A0F, #1a1a2e);
-  color: #FFFFFF;
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
-  font-size: 15px;
-  padding: 14px 32px;
+  font-size: .92rem;
+  padding: 12px 28px;
   border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
-  letter-spacing: 0;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+  transition: all var(--spring);
+  box-shadow: 0 4px 16px var(--accent-glow);
   position: relative;
   overflow: hidden;
 }
@@ -1889,12 +1891,12 @@ function renderGenerate(el) {
         <p style="font-size:13px;color:var(--text-muted);margin:8px 0 12px;">Base sur l'analyse de 25+ marques concurrentes</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           ${state.structures.map(s => `
-            <div class="structure-card ${state.selectedStructure === s.id ? 'active' : ''}" onclick="state.selectedStructure='${s.id}';renderPage();" style="padding:14px;border:1.5px solid ${state.selectedStructure === s.id ? 'var(--accent)' : 'var(--border)'};border-radius:12px;cursor:pointer;transition:all 0.2s;background:${state.selectedStructure === s.id ? 'var(--accent-bg)' : 'rgba(255,255,255,0.8)'};">
+            <div class="structure-card ${state.selectedStructure === s.id ? 'active' : ''}" onclick="state.selectedStructure='${s.id}';renderPage();" style="padding:14px;border:1px solid ${state.selectedStructure === s.id ? 'var(--accent-solid)' : 'var(--glass-border)'};border-radius:12px;cursor:pointer;transition:all var(--transition);background:${state.selectedStructure === s.id ? 'var(--accent-soft)' : 'var(--glass)'};color:var(--text);">
               <div style="font-weight:600;font-size:13px;margin-bottom:4px;">${s.name}</div>
               <div style="font-size:11px;color:var(--text-muted);line-height:1.4;">${s.description}</div>
             </div>
           `).join('')}
-          <div class="structure-card ${!state.selectedStructure ? 'active' : ''}" onclick="state.selectedStructure=null;renderPage();" style="padding:14px;border:1.5px solid ${!state.selectedStructure ? 'var(--accent)' : 'var(--border)'};border-radius:12px;cursor:pointer;transition:all 0.2s;background:${!state.selectedStructure ? 'var(--accent-bg)' : 'rgba(255,255,255,0.8)'};">
+          <div class="structure-card ${!state.selectedStructure ? 'active' : ''}" onclick="state.selectedStructure=null;renderPage();" style="padding:14px;border:1px solid ${!state.selectedStructure ? 'var(--accent-solid)' : 'var(--glass-border)'};border-radius:12px;cursor:pointer;transition:all var(--transition);background:${!state.selectedStructure ? 'var(--accent-soft)' : 'var(--glass)'};color:var(--text);">
             <div style="font-weight:600;font-size:13px;margin-bottom:4px;">Auto</div>
             <div style="font-size:11px;color:var(--text-muted);line-height:1.4;">L'IA choisit la meilleure structure</div>
           </div>
