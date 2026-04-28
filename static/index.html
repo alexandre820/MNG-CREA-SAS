@@ -1593,6 +1593,7 @@ let state = {
   selectedFormats: ['4:5'],
   studioFilter: null,
   studioStatusFilter: 'all',  // all | draft | to_test | winner | killed
+  studioTagFilter: null,  // null | "angle:<value>" | "hook:<value>"
   studioPersonaFilter: 'all',
   studioBatchFilter: 'all',
   studioImages: [],
@@ -1703,9 +1704,18 @@ async function loadState() {
     if (brands.length > 0 && !state.currentBrand) {
       state.currentBrand = brands[0];
       const products = await api(`/api/brands/${brands[0].id}/products`);
-      state.products = products;
+      // Sort products: Brainstoorm first, others after
+      state.products = (products || []).sort((a, b) => {
+        const aIsBs = /brainstoorm/i.test(a.name || '');
+        const bIsBs = /brainstoorm/i.test(b.name || '');
+        if (aIsBs && !bIsBs) return -1;
+        if (!aIsBs && bIsBs) return 1;
+        return 0;
+      });
+      // Default selected product = Brainstoorm (or first if not found)
       if (state.products.length && !state.selectedProductId) {
-        state.selectedProductId = state.products[0].id;
+        const brainstoorm = state.products.find(p => /brainstoorm/i.test(p.name || ''));
+        state.selectedProductId = (brainstoorm || state.products[0]).id;
       }
     }
 
@@ -2266,7 +2276,7 @@ function renderGenerate(el) {
         <div class="gen-summary">
           <strong id="summary-count">${state.genCount || 4}</strong> Creas &middot; <strong id="summary-format">${state.selectedFormats.join(', ')}</strong> &middot; <strong id="summary-res">2K</strong>
           <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">
-            ~&euro;${((state.genCount || 4) * state.selectedFormats.length * 0.04).toFixed(2)} estime
+            ~&euro;${((state.genCount || 4) * state.selectedFormats.length * 0.04).toFixed(2)} estimé
           </span>
           <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">
             ${state.selectedStructure ? (state.structures?.find(s => s.id === state.selectedStructure)?.name || '') : 'Auto'}
@@ -2578,7 +2588,18 @@ function renderStudio(el) {
     return true;
   };
 
-  const filterImages = (images) => images.filter(img => matchesStatus(img) && matchesLegacy(img));
+  const imageMatchesTagFilter = (img) => {
+    if (!state.studioTagFilter) return true;
+    try {
+      const tags = typeof img.tags === 'string' ? JSON.parse(img.tags || '{}') : (img.tags || {});
+      const [type, value] = state.studioTagFilter.split(':');
+      if (type === 'angle') return (tags.messaging_angle || []).includes(value);
+      if (type === 'hook') return (tags.hook_type || []).includes(value);
+    } catch(e) {}
+    return false;
+  };
+
+  const filterImages = (images) => images.filter(img => matchesStatus(img) && matchesLegacy(img) && imageMatchesTagFilter(img));
 
   // Counts for status pills
   const counts = { all: allImages.length, draft: 0, to_test: 0, winner: 0, killed: 0 };
@@ -2604,6 +2625,9 @@ function renderStudio(el) {
         <p>Creations (${allImages.length})</p>
       </div>
       <div class="studio-header-actions">
+        <button class="btn btn-secondary" onclick="autoTagAllImages()" title="Auto-tag toutes les images sans tags">
+          🏷️ Auto-tag
+        </button>
         <button class="btn btn-primary" onclick="navigate('generate')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           Generer
@@ -2630,7 +2654,7 @@ function renderStudio(el) {
       </div>
     ` : ''}
 
-    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
       ${statusPill('all', 'Tous')}
       ${statusPill('draft', 'Drafts')}
       ${statusPill('to_test', 'A tester')}
@@ -2638,7 +2662,33 @@ function renderStudio(el) {
       ${statusPill('killed', 'Killed')}
     </div>
 
+    <div style="margin-top:12px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+      <span style="font-size:11px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:1px;margin-right:8px;">Filtre tag :</span>
+      <button class="pill ${!state.studioTagFilter ? 'active' : ''}" onclick="state.studioTagFilter=null;renderPage()">Aucun</button>
+      ${['ballonnements','crash_energie','focus','stress','alternative_cafe'].map(angle => `
+        <button class="pill ${state.studioTagFilter==='angle:'+angle ? 'active' : ''}" onclick="state.studioTagFilter='angle:${angle}';renderPage()">📌 ${angle}</button>
+      `).join('')}
+      ${['pov','question','choc','listicle','prix','social_proof'].map(hook => `
+        <button class="pill ${state.studioTagFilter==='hook:'+hook ? 'active' : ''}" onclick="state.studioTagFilter='hook:${hook}';renderPage()">🪝 ${hook}</button>
+      `).join('')}
+    </div>
+
     ${gens.length > 0 ? `
+      ${(() => {
+        const totalVisible = gens.reduce((acc, g) => acc + filterImages(g.images).length, 0);
+        const hasActive = activeGens.length > 0;
+        const hasFilter = state.studioStatusFilter !== 'all' || state.studioTagFilter;
+        if (totalVisible === 0 && !hasActive && hasFilter) {
+          return `
+            <div style="text-align:center;padding:40px 20px;color:var(--text2);">
+              <div style="font-size:36px;margin-bottom:12px;opacity:0.5;">🔍</div>
+              <div style="color:var(--text);font-size:15px;margin-bottom:6px;">Aucune créa avec ce filtre</div>
+              <div style="font-size:13px;">Change de filtre ou clique sur "Aucun" pour tout voir.</div>
+            </div>
+          `;
+        }
+        return '';
+      })()}
       ${gens.map(g => {
         const visible = filterImages(g.images);
         if (visible.length === 0 && g.status !== 'generating' && g.status !== 'pending') return '';
@@ -2658,7 +2708,17 @@ function renderStudio(el) {
           <div class="studio-grid">
             ${visible.map(img => {
               const status = getStatus(img);
-              const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? [img.tags] : []);
+              // Parse tags : peut etre une string JSON, un objet {messaging_angle:[],hook_type:[]} ou un array de strings (legacy)
+              let tagPills = [];
+              try {
+                const raw = typeof img.tags === 'string' ? JSON.parse(img.tags || '{}') : (img.tags || {});
+                if (Array.isArray(raw)) {
+                  tagPills = raw.map(v => ({ type: '', value: v, label: String(v) }));
+                } else if (raw && typeof raw === 'object') {
+                  (raw.messaging_angle || []).forEach(v => tagPills.push({ type: 'angle', value: v, label: '📌 ' + v }));
+                  (raw.hook_type || []).forEach(v => tagPills.push({ type: 'hook', value: v, label: '🪝 ' + v }));
+                }
+              } catch(e) {}
               return `
               <div class="studio-card-wrapper ${img.rating === 'winner' ? 'winner-card' : ''}${img.rating === 'kill' ? 'kill-card' : ''}">
                 <div class="image-card" onclick="openLightbox('/api/image/${img.id}')" style="position:relative;">
@@ -2681,9 +2741,12 @@ function renderStudio(el) {
                   <button class="${status === 'winner' ? 'active' : ''}" onclick="setImageStatus('${img.id}','winner')">Winner</button>
                   <button class="${status === 'killed' ? 'active' : ''}" onclick="setImageStatus('${img.id}','killed')">Killed</button>
                 </div>
-                ${tags.length > 0 ? `
+                ${tagPills.length > 0 ? `
                   <div class="studio-tags-row">
-                    ${tags.map(t => `<span class="studio-tag">${t}</span>`).join('')}
+                    ${tagPills.map(t => t.type
+                      ? `<button class="studio-tag" onclick="event.stopPropagation();state.studioTagFilter='${t.type}:${t.value}';renderPage()" style="cursor:pointer;border:1px solid var(--glass-border);" title="Filtrer par ${t.type}:${t.value}">${t.label}</button>`
+                      : `<span class="studio-tag">${t.label}</span>`
+                    ).join('')}
                   </div>
                 ` : ''}
                 <div class="quick-actions" onclick="event.stopPropagation()">
@@ -2823,7 +2886,9 @@ async function iterateImage(imageId, brandId, productId, aspectRatio) {
 async function launchBatchAngles() {
   const brand = state.currentBrand;
   if (!brand) return alert('Configurez d\'abord votre marque.');
-  const productId = state.products[0]?.id;
+  // Default to Brainstoorm if not selected
+  const brainstoorm = (state.products || []).find(p => /brainstoorm/i.test(p.name || ''));
+  const productId = state.selectedProductId || brainstoorm?.id || state.products[0]?.id;
   if (!productId) return alert('Ajoutez un produit d\'abord.');
   if (!confirm('Generer 8 creas (1 par angle) ? Cela utilisera 8 credits FAL.')) return;
 
@@ -2873,7 +2938,8 @@ async function deleteInspiration(id) {
 
 async function generateFromInspo(inspoId) {
   const brand = state.currentBrand;
-  const productId = document.querySelector('.product-card.active')?.dataset?.productId || state.products[0]?.id || '';
+  const brainstoorm = (state.products || []).find(p => /brainstoorm/i.test(p.name || ''));
+  const productId = document.querySelector('.product-card.active')?.dataset?.productId || state.selectedProductId || brainstoorm?.id || state.products[0]?.id || '';
   const angle = prompt('Angle marketing pour cette crea:') || '';
   if (!angle) return;
 
@@ -3040,6 +3106,9 @@ function renderCompetitors(el) {
             ${ads[0].brand_logo ? `<img src="/api/proxy-image?url=${encodeURIComponent(ads[0].brand_logo)}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1px solid var(--glass-border);" onerror="this.style.display='none'">` : ''}
             <h3 style="font-family:var(--font-serif);font-size:1.25rem;color:var(--text);font-weight:400;font-style:italic;">${brand}</h3>
             <span style="font-size:11px;color:var(--text3);background:var(--glass);padding:2px 8px;border-radius:10px;">${ads.length} créa${ads.length>1?'s':''}</span>
+            <button class="btn btn-ghost" style="margin-left:auto;font-size:11px;padding:4px 10px;" onclick="buildBrandIntel('${brand.replace(/'/g,'\\\'')}')" title="Pull TrendTrack pour analyser tous les patterns">
+              🔍 Build intel
+            </button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">
             ${ads.map((ad, idx) => `
@@ -3386,6 +3455,9 @@ async function renderExpert(el) {
         <p>Le skill auto-genere qui analyse tes creas. Plus tu marques de winners + insights, plus il devient malin.</p>
       </div>
       <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="syncFeedbackLoop()" title="Auto-tag winners/killed depuis Ad Doctor">
+          🔄 Sync verdicts Ad Doctor
+        </button>
         <button class="btn btn-secondary" onclick="exportExpertSkill()">Re-exporter le skill</button>
         <button class="btn btn-secondary" onclick="previewExpertSkill()">Preview markdown</button>
       </div>
@@ -3443,7 +3515,13 @@ async function loadExpertData() {
     const lEl = document.getElementById('expert-learnings');
     if (lEl) {
       if (learnings.winner_count === 0) {
-        lEl.innerHTML = `<div style="color:var(--text2);font-size:13px;">Aucun winner pour l'instant. Marque des creas dans Studio (status=Winner).</div>`;
+        lEl.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;color:var(--text2);">
+            <div style="font-size:36px;margin-bottom:12px;opacity:0.5;">🏆</div>
+            <div style="color:var(--text);font-size:15px;margin-bottom:6px;">Pas encore de winners</div>
+            <div style="font-size:13px;">Marque des créas dans Studio (status = Winner) pour alimenter les learnings.</div>
+          </div>
+        `;
       } else {
         const block = (title, items, key) => items && items.length ? `
           <div style="margin-bottom:14px;">
@@ -3467,7 +3545,13 @@ async function loadExpertData() {
     const iEl = document.getElementById('expert-insights');
     if (iEl) {
       if (insights.length === 0) {
-        iEl.innerHTML = `<div style="color:var(--text2);font-size:13px;">Aucun insight collecte. Va dans Studio puis bouton Insight sur tes winners.</div>`;
+        iEl.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;color:var(--text2);">
+            <div style="font-size:36px;margin-bottom:12px;opacity:0.5;">💡</div>
+            <div style="color:var(--text);font-size:15px;margin-bottom:6px;">Pas encore d'insights</div>
+            <div style="font-size:13px;">Va dans Studio puis clique "Insight" sur tes winners pour collecter les patterns.</div>
+          </div>
+        `;
       } else {
         const typeLabels = {
           hook_pattern: 'Hook',
@@ -3533,6 +3617,76 @@ async function deleteInsight(id) {
   if (!confirm('Supprimer cet insight ?')) return;
   await fetch(`/api/expert-insights/${id}`, {method:'DELETE'});
   loadExpertData();
+}
+
+async function autoTagAllImages() {
+  if (!confirm('Lancer l\'auto-tagging sur toutes les images sans tags ?')) return;
+  try {
+    const r = await fetch('/api/auto-tag-all', {method:'POST'});
+    const d = await r.json();
+    alert(`✅ ${d.tagged_count} images taggées sur 8 catégories`);
+    if (typeof loadState === 'function') await loadState();
+    renderPage();
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function syncFeedbackLoop() {
+  if (!confirm('Synchroniser les verdicts Ad Doctor (CPA<27€=Winner, CPA>45€=Killed) avec les statuts des images ?')) return;
+  try {
+    const r = await fetch('/api/feedback-loop/sync', {method:'POST'});
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ ${d.updated_count} créas mises à jour\n🏆 ${d.auto_winners.length} winners auto\n☠️ ${d.auto_killed.length} killed auto`);
+      loadExpertData();
+    } else {
+      alert('⚠️ ' + (d.error || 'Pas de data Ad Doctor'));
+    }
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function buildBrandIntel(competitorName) {
+  // Find brandtracker_id from state.trending.ads
+  const ad = (state.trending?.ads || []).find(a => a.brand_name === competitorName);
+  if (!ad) return alert('Marque introuvable');
+  // Need brandtracker_id but we don't have it directly... Use known mapping
+  const mapping = {
+    'RYZE Superfoods': 'db2a6deb-2452-4e2a-87dc-e96650f60459',
+    'Bonjour': 'af35a925-7fe2-43c3-8565-e40bf7b01502',
+    'French Mush': '0e463119-4c59-4162-9089-e47906b1b0a4',
+    'Wake Nutrition': '5cc26b79-2f5e-42a5-bf06-d040e2e9dd32',
+    'Dyna': '345b1ac1-304c-43b7-8c7a-85dddce3e222',
+    'AG1': '3b1b2e9c-7873-40c7-9442-a4d37ce412ab',
+    'Everyday Dose': '461e5c73-ca20-4ae2-8072-2bc1ed0a8343',
+    'Four Sigmatic': 'aab4cbf7-ba6d-42c0-9507-70900b1f6de4',
+    'Spacegoods': '81464660-b02b-420a-bfa7-43a06929199c',
+    'Naali': '2b2a7ce5-4854-406c-8218-e173773dccae',
+    'Humble+': '52886604-cfee-43e9-b88e-f71980d1f01b',
+    'IM8 Health': '74dd7484-2a3f-449b-8174-c47e21b4efd5',
+    'Goli': '89223c90-e4b8-4c19-9f21-c0605c31a143',
+    '900.care': 'c3ed97e7-5a3e-4004-aeac-d3a905ec810c',
+    'My Variations': '51acb0af-a258-4721-b055-ee4d5dd13de2',
+    'Flytex': 'c045ee98-7e2c-4442-a10b-91e0045f6980',
+    'Lilly Skin': '98ea7adc-1239-4ed3-97ab-ddfad3bc0fcd',
+    'Fincut': '569832a7-e4dc-4630-8311-1abf4bf20642',
+    'Pacha': '30471bb0-3a8d-41df-b55e-dccf05a42219',
+  };
+  const btr_id = mapping[competitorName];
+  if (!btr_id) return alert('Brandtracker ID introuvable pour ' + competitorName);
+  if (!confirm(`Pull 30 top créas de ${competitorName} et auto-tag ? (Coûts : ~30 crédits TrendTrack)`)) return;
+
+  try {
+    const r = await fetch('/api/brand-intel/build', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({brandtracker_id: btr_id, competitor_name: competitorName}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      alert(`✅ ${d.creatives_added} créas analysées et auto-taggées pour ${competitorName}`);
+    } else {
+      alert('⚠️ ' + (d.error || 'Erreur inconnue'));
+    }
+  } catch (e) { alert('Erreur : ' + e.message); }
 }
 
 
@@ -3605,7 +3759,13 @@ async function loadSnapshots() {
   try {
     const items = await api('/api/snapshots');
     if (items.length === 0) {
-      list.innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text2);">Aucun snapshot. Cree-en un.</div>`;
+      list.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;color:var(--text2);">
+          <div style="font-size:36px;margin-bottom:12px;opacity:0.5;">📸</div>
+          <div style="color:var(--text);font-size:15px;margin-bottom:6px;">Pas encore de snapshot</div>
+          <div style="font-size:13px;">Clique sur "Nouveau snapshot" pour créer ton premier rapport partageable.</div>
+        </div>
+      `;
       return;
     }
     list.innerHTML = items.map(s => {
@@ -4295,7 +4455,13 @@ function renderPersonaModal() {
                 <div style="font-size:11px;color:var(--text2);">${(p.description||'').slice(0,80)}</div>
               </div>
             </label>
-          `).join('') || '<p style="color:var(--text3);">Aucune persona configurée</p>'}
+          `).join('') || `
+            <div style="text-align:center;padding:40px 20px;color:var(--text2);">
+              <div style="font-size:36px;margin-bottom:12px;opacity:0.5;">👥</div>
+              <div style="color:var(--text);font-size:15px;margin-bottom:6px;">Aucune persona configurée</div>
+              <div style="font-size:13px;">Ajoute des personas dans la stratégie de marque pour activer ce générateur.</div>
+            </div>
+          `}
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="state.showPersonaModal=false;renderPage()">Annuler</button>
