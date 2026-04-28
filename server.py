@@ -1599,21 +1599,167 @@ async def trendtrack_top_ads(
     }
 
 
+# Cache directory for downloaded competitor + Meta thumbnails
+THUMB_CACHE_DIR = DATA_DIR / "thumb_cache"
+THUMB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _cache_image_from_url(url: str) -> Optional[Path]:
+    """Download image and cache it locally. Returns local file path or None on failure."""
+    if not url or not url.startswith("http"):
+        return None
+    import hashlib
+    # Hash URL to filename to avoid collisions
+    url_hash = hashlib.md5(url.encode()).hexdigest()
+    # Detect extension from URL
+    ext = ".jpg"
+    for e in [".jpg", ".jpeg", ".png", ".webp"]:
+        if e in url.lower().split("?")[0]:
+            ext = e
+            break
+    cache_path = THUMB_CACHE_DIR / f"{url_hash}{ext}"
+    if cache_path.exists() and cache_path.stat().st_size > 0:
+        return cache_path
+    try:
+        r = requests.get(url, timeout=15, headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        })
+        r.raise_for_status()
+        cache_path.write_bytes(r.content)
+        return cache_path
+    except Exception as e:
+        print(f"[thumb_cache] failed to fetch {url[:60]}: {e}")
+        return None
+
+
 @app.get("/api/proxy-image")
 async def proxy_image(url: str):
-    """Proxy external images to bypass CORS / hotlink restrictions."""
+    """Cache + serve external images. Always returns from local disk if available."""
     try:
-        r = requests.get(url, timeout=10, stream=True, headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        cache_path = _cache_image_from_url(url)
+        if cache_path and cache_path.exists():
+            from fastapi.responses import FileResponse
+            return FileResponse(str(cache_path), headers={
+                "Cache-Control": "public, max-age=86400"
+            })
+        # Fallback: stream directly if cache failed
+        r = requests.get(url, timeout=10, headers={
+            "User-Agent": "Mozilla/5.0"
         })
         r.raise_for_status()
         content_type = r.headers.get("content-type", "image/jpeg")
         from fastapi.responses import Response
-        return Response(content=r.content, media_type=content_type, headers={
-            "Cache-Control": "public, max-age=86400"
-        })
+        return Response(content=r.content, media_type=content_type)
     except Exception as e:
         raise HTTPException(404, f"Image fetch failed: {e}")
+
+
+@app.post("/api/cache-all-competitor-thumbs")
+async def cache_all_competitor_thumbs():
+    """Pull all competitor top-ads from TrendTrack + download all thumbnails to local cache."""
+    if not TRENDTRACK_API_KEY:
+        raise HTTPException(503, "TrendTrack not configured")
+
+    # The 19 brand IDs we track
+    BRAND_IDS = [
+        "db2a6deb-2452-4e2a-87dc-e96650f60459",  # RYZE
+        "af35a925-7fe2-43c3-8565-e40bf7b01502",  # Bonjour
+        "0e463119-4c59-4162-9089-e47906b1b0a4",  # French Mush
+        "5cc26b79-2f5e-42a5-bf06-d040e2e9dd32",  # Wake
+        "345b1ac1-304c-43b7-8c7a-85dddce3e222",  # Dyna
+        "3b1b2e9c-7873-40c7-9442-a4d37ce412ab",  # AG1
+        "461e5c73-ca20-4ae2-8072-2bc1ed0a8343",  # Everyday Dose
+        "aab4cbf7-ba6d-42c0-9507-70900b1f6de4",  # Four Sigmatic
+        "81464660-b02b-420a-bfa7-43a06929199c",  # Spacegoods
+        "2b2a7ce5-4854-406c-8218-e173773dccae",  # Naali
+        "52886604-cfee-43e9-b88e-f71980d1f01b",  # Humble+
+        "74dd7484-2a3f-449b-8174-c47e21b4efd5",  # IM8
+        "89223c90-e4b8-4c19-9f21-c0605c31a143",  # Goli
+        "c3ed97e7-5a3e-4004-aeac-d3a905ec810c",  # 900.care
+        "51acb0af-a258-4721-b055-ee4d5dd13de2",  # My Variations
+        "c045ee98-7e2c-4442-a10b-91e0045f6980",  # Flytex
+        "98ea7adc-1239-4ed3-97ab-ddfad3bc0fcd",  # Lilly Skin
+        "569832a7-e4dc-4630-8311-1abf4bf20642",  # Fincut
+        "30471bb0-3a8d-41df-b55e-dccf05a42219",  # Pacha
+    ]
+
+    headers = {"Authorization": f"Bearer {TRENDTRACK_API_KEY}"}
+    urls_to_cache = set()
+    from concurrent.futures import ThreadPoolExecutor
+
+    def fetch_brand_urls(brand_id):
+        try:
+            r = requests.get(
+                f"{TRENDTRACK_BASE}/v1/brandtrackers/{brand_id}/top-ads",
+                headers=headers,
+                params={"sortBy": "currentRank", "limit": 3, "mediaType": "image"},
+                timeout=20,
+            )
+            if r.status_code != 200:
+                return []
+            urls = []
+            for item in r.json().get("data", []):
+                ad = item.get("ad", {}) or {}
+                media = ad.get("media", {}) or {}
+                advertiser = ad.get("advertiser", {}) or {}
+                tu = media.get("thumbnailUrl")
+                lu = advertiser.get("logoUrl")
+                if tu: urls.append(tu)
+                if lu: urls.append(lu)
+            return urls
+        except Exception:
+            return []
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        results = list(ex.map(fetch_brand_urls, BRAND_IDS))
+    for batch in results:
+        urls_to_cache.update(batch)
+
+    # Download all in parallel
+    downloaded = 0
+    failed = 0
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        cached = list(ex.map(_cache_image_from_url, urls_to_cache))
+    for c in cached:
+        if c: downloaded += 1
+        else: failed += 1
+
+    return {
+        "ok": True,
+        "total_urls": len(urls_to_cache),
+        "downloaded": downloaded,
+        "failed": failed,
+        "cache_dir": str(THUMB_CACHE_DIR),
+    }
+
+
+@app.post("/api/cache-all-mng-thumbs")
+async def cache_all_mng_thumbs():
+    """Download all Meta ad thumbnails for our generated images (tags by ad_id)."""
+    token = _get_meta_token()
+    if not token:
+        raise HTTPException(503, "Meta token not available")
+
+    # Read existing meta thumbnails cache and pull thumbs for each
+    cache_path = DATA_DIR / "meta_thumbnails_cache.json"
+    if not cache_path.exists():
+        return {"ok": False, "error": "No meta_thumbnails_cache.json yet"}
+    try:
+        thumbs = json.loads(cache_path.read_text())
+    except Exception as e:
+        raise HTTPException(500, f"cache read failed: {e}")
+
+    from concurrent.futures import ThreadPoolExecutor
+    urls = [u for u in thumbs.values() if u]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        cached = list(ex.map(_cache_image_from_url, urls))
+    downloaded = sum(1 for c in cached if c)
+    return {
+        "ok": True,
+        "total_urls": len(urls),
+        "downloaded": downloaded,
+        "failed": len(urls) - downloaded,
+    }
 
 
 def _get_meta_token() -> str:
