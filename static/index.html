@@ -1593,6 +1593,15 @@ let state = {
   insightImageId: null,
   variantSourceImageId: null,
   personaSourceImageId: null,
+  // Wave 1B/2D state
+  personasList: [],
+  autoBriefs: [],
+  showHookGenModal: false,
+  showBriefAutoModal: false,
+  generatedHooks: [],
+  hookGenAngle: '',
+  briefAutoLoading: false,
+  briefAutoResult: null,
 };
 
 // Polling for active generations
@@ -1694,6 +1703,10 @@ async function loadState() {
       state.strategy = strategy;
       state.competitors = competitors || [];
     }
+
+    // Wave 1B/2D — load personas + auto briefs
+    try { state.personasList = await api('/api/personas'); } catch(e) { state.personasList = []; }
+    try { state.autoBriefs = await api('/api/auto-briefs?brand_id=' + (state.currentBrand?.id||'')); } catch(e) { state.autoBriefs = []; }
   } catch (e) {
     console.error('Load state error:', e);
   }
@@ -2094,6 +2107,31 @@ function renderGenerate(el) {
         </div>
       </div>
       ` : ''}
+
+      <!-- ACTIONS RAPIDES (Wave 1B/2D) -->
+      <div class="form-section" style="background:linear-gradient(135deg,rgba(167,139,250,.10),rgba(249,247,132,.06));">
+        <div class="form-section-title">⚡ Actions rapides</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+          <button class="btn btn-secondary" onclick="openHookGenerator()" style="justify-content:flex-start;text-align:left;">
+            <div>
+              <div style="font-weight:700;font-size:13px;">🪝 Générer 10 hooks</div>
+              <div style="font-size:11px;color:var(--text2);font-weight:400;">À partir d'un angle</div>
+            </div>
+          </button>
+          <button class="btn btn-secondary" onclick="openBriefAuto()" style="justify-content:flex-start;text-align:left;">
+            <div>
+              <div style="font-weight:700;font-size:13px;">🔍 Brief depuis concurrent</div>
+              <div style="font-size:11px;color:var(--text2);font-weight:400;">Meta Ads Library / TrendTrack</div>
+            </div>
+          </button>
+          <button class="btn btn-secondary" onclick="launchPersonaBatch()" style="justify-content:flex-start;text-align:left;">
+            <div>
+              <div style="font-weight:700;font-size:13px;">👥 Batch 4 personas</div>
+              <div style="font-size:11px;color:var(--text2);font-weight:400;">1 angle → 4 versions</div>
+            </div>
+          </button>
+        </div>
+      </div>
 
       <!-- ANGLE MARKETING — le champ principal -->
       <div class="form-section">
@@ -3944,7 +3982,15 @@ function renderPersonaModal() {
           Meme angle, 4 versions adaptees a chaque persona MNG
         </p>
         <div id="persona-checkboxes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
-          <em style="color:var(--text3);font-size:12px;">Chargement personas...</em>
+          ${(state.personasList||[]).map(p => `
+            <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:8px;cursor:pointer;">
+              <input type="checkbox" value="${p.id}" checked>
+              <div>
+                <div style="font-weight:600;color:var(--text);">${p.name}</div>
+                <div style="font-size:11px;color:var(--text2);">${(p.description||'').slice(0,80)}</div>
+              </div>
+            </label>
+          `).join('') || '<p style="color:var(--text3);">Aucune persona configurée</p>'}
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost" onclick="state.showPersonaModal=false;renderPage()">Annuler</button>
@@ -3957,26 +4003,238 @@ function renderPersonaModal() {
 
 async function launchVariantGeneration() {
   const count = parseInt(document.getElementById('variant-count')?.value || '5');
+  const parentId = state.variantSourceImageId;
   state.showVariantModal = false;
   renderPage();
-  // The actual endpoint will be built by Agent 1B
-  alert(`Lancement de ${count} variantes... (Backend Agent 1B en cours)`);
+  try {
+    const res = await fetch('/api/generate/ab-variants', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({parent_image_id: parentId, count}),
+    });
+    const data = await res.json();
+    alert(`✅ ${data.count} variantes lancées. Va dans Studio.`);
+    navigate('studio');
+  } catch (e) { alert('Erreur : ' + e.message); }
 }
 
 async function launchPersonaGeneration() {
+  const checkboxes = document.querySelectorAll('#persona-checkboxes input[type=checkbox]:checked');
+  const persona_ids = Array.from(checkboxes).map(c => c.value);
+  const sourceImgId = state.personaSourceImageId;
+  // Get the source image's prompt as angle
+  const allImgs = (state.studioImages || []).find(i => i.id === sourceImgId);
+  const angle = allImgs?.prompt_used?.slice(0,200) || 'Reproduire pour cette persona';
+
   state.showPersonaModal = false;
   renderPage();
-  alert('Lancement generation 4 personas... (Backend Agent 1B en cours)');
+
+  try {
+    const res = await fetch('/api/generate/personas-batch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        brand_id: state.currentBrand?.id,
+        product_id: state.selectedProductId,
+        angle,
+        persona_ids,
+        aspect_ratio: '4:5',
+        language: 'fr',
+        formats: '["4:5"]',
+      }),
+    });
+    const data = await res.json();
+    alert(`✅ ${data.count} générations lancées. Va dans Studio.`);
+    navigate('studio');
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+// ---- Hook Generator (Wave 1B) ----
+async function openHookGenerator() {
+  const currentAngle = document.getElementById('angle-input')?.value || '';
+  state.hookGenAngle = currentAngle;
+  state.showHookGenModal = true;
+  state.generatedHooks = [];
+  renderPage();
+  if (currentAngle) {
+    await generateHooksForAngle(currentAngle);
+  }
+}
+
+async function generateHooksForAngle(angle) {
+  try {
+    const res = await fetch('/api/generate-hooks', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({angle, brand_dna: state.currentBrand?.brand_dna || ''}),
+    });
+    const data = await res.json();
+    state.generatedHooks = data.hooks || [];
+    renderPage();
+  } catch (e) { alert('Erreur: ' + e.message); }
+}
+
+function renderHookGenModal() {
+  if (!state.showHookGenModal) return '';
+  return `
+    <div class="studio-modal-overlay" onclick="if(event.target.classList.contains('studio-modal-overlay')){state.showHookGenModal=false;renderPage();}">
+      <div class="studio-modal-content" style="max-width:680px;">
+        <h2>🪝 Hook Generator</h2>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:14px;">10 hooks tirés de 5 typologies (POV, Question, Choc, Listicle, Prix)</p>
+        <input type="text" id="hookgen-angle" placeholder="Angle marketing..." value="${state.hookGenAngle||''}" style="margin-bottom:10px;">
+        <button class="btn btn-primary" onclick="generateHooksForAngle(document.getElementById('hookgen-angle').value)" style="margin-bottom:14px;">⚡ Générer 10 hooks</button>
+        <div style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+          ${(state.generatedHooks||[]).map(h => `
+            <div style="padding:10px 12px;background:var(--glass);border:1px solid var(--glass-border);border-radius:8px;cursor:pointer;transition:all var(--transition);" onclick="useHook('${(h.text||'').replace(/'/g,"\\'")}')">
+              <div style="font-size:11px;color:var(--accent-solid);font-weight:700;margin-bottom:3px;">${h.label||''}</div>
+              <div style="font-size:13px;color:var(--text);">${h.text||''}</div>
+            </div>
+          `).join('') || '<p style="color:var(--text3);text-align:center;padding:20px;">Saisis un angle puis clique sur Générer</p>'}
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="state.showHookGenModal=false;renderPage()">Fermer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function useHook(hookText) {
+  const angleInput = document.getElementById('angle-input');
+  if (angleInput) {
+    angleInput.value = hookText;
+    angleInput.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+  state.showHookGenModal = false;
+  renderPage();
+}
+
+// ---- Brief Auto (Wave 2D) ----
+function openBriefAuto() {
+  state.showBriefAutoModal = true;
+  state.briefAutoLoading = false;
+  state.briefAutoResult = null;
+  renderPage();
+}
+
+async function fetchBriefAuto() {
+  const url = document.getElementById('brief-auto-url')?.value?.trim();
+  const screenshotText = document.getElementById('brief-auto-screenshot')?.value || '';
+  const trendtrackId = document.getElementById('brief-auto-tt-id')?.value?.trim();
+
+  if (!url && !trendtrackId) return alert('Donne un URL ou un TrendTrack ad ID');
+
+  state.briefAutoLoading = true;
+  renderPage();
+
+  try {
+    let endpoint, body;
+    if (trendtrackId) {
+      endpoint = '/api/auto-brief/trendtrack';
+      body = {ad_id: trendtrackId, brand_id: state.currentBrand?.id};
+    } else {
+      endpoint = '/api/auto-brief/meta-library';
+      body = {url, brand_id: state.currentBrand?.id, screenshot_text: screenshotText};
+    }
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    state.briefAutoResult = await res.json();
+    state.briefAutoLoading = false;
+    renderPage();
+  } catch (e) {
+    state.briefAutoLoading = false;
+    alert('Erreur : ' + e.message);
+    renderPage();
+  }
+}
+
+function useBrief(headline, copy) {
+  const angleInput = document.getElementById('angle-input');
+  if (angleInput) {
+    angleInput.value = headline || (copy || '').slice(0,150);
+    angleInput.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  state.showBriefAutoModal = false;
+  renderPage();
+}
+
+function renderBriefAutoModal() {
+  if (!state.showBriefAutoModal) return '';
+  const r = state.briefAutoResult;
+  return `
+    <div class="studio-modal-overlay" onclick="if(event.target.classList.contains('studio-modal-overlay')){state.showBriefAutoModal=false;renderPage();}">
+      <div class="studio-modal-content" style="max-width:680px;">
+        <h2>🔍 Brief auto</h2>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:14px;">Colle un lien Meta Ads Library OU un ad ID TrendTrack</p>
+        <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">URL Meta Ads Library</label>
+        <input type="text" id="brief-auto-url" placeholder="https://www.facebook.com/ads/library/?id=..." style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">OU TrendTrack Ad ID</label>
+        <input type="text" id="brief-auto-tt-id" placeholder="facebook_xxxxxxxxxxx" style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Screenshot (optionnel — colle le copy si Meta bloque)</label>
+        <textarea id="brief-auto-screenshot" placeholder="Le texte de la créa que tu vois..." style="margin-bottom:14px;min-height:80px;"></textarea>
+        <button class="btn btn-primary" onclick="fetchBriefAuto()" ${state.briefAutoLoading ? 'disabled' : ''}>${state.briefAutoLoading ? '⏳ Analyse...' : '🔍 Extraire le brief'}</button>
+        ${r ? `
+          <div style="margin-top:18px;padding:14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:8px;">
+            <div style="font-size:11px;color:var(--accent-solid);font-weight:700;margin-bottom:4px;">${r.competitor_name||'Concurrent'}</div>
+            <div style="font-weight:600;font-size:14px;color:var(--text);margin-bottom:6px;">${r.extracted_headline||'(pas de headline)'}</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:10px;">${(r.extracted_copy||'').slice(0,300)}${(r.extracted_copy||'').length>300?'...':''}</div>
+            ${r.visual_url?`<img src="${r.visual_url}" style="max-width:100%;border-radius:6px;margin-bottom:10px;">`:''}
+            ${r.scraping_note?`<div style="font-size:11px;color:var(--orange);font-style:italic;margin-bottom:10px;">${r.scraping_note}</div>`:''}
+            <button class="btn btn-primary" onclick="useBrief('${(r.extracted_headline||'').replace(/'/g,"\\'")}','${(r.extracted_copy||'').replace(/'/g,"\\'").slice(0,200)}')">⚡ Utiliser comme angle</button>
+          </div>
+        ` : ''}
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="state.showBriefAutoModal=false;renderPage()">Fermer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ---- Persona batch launcher (from Generate page) ----
+async function launchPersonaBatch() {
+  const angle = document.getElementById('angle-input')?.value;
+  if (!angle || !angle.trim()) return alert('Saisis un angle d\'abord');
+  if (!state.currentBrand) return alert('Configure une marque d\'abord');
+  if (!state.selectedProductId) return alert('Sélectionne un produit');
+
+  if (!confirm(`Lancer 4 générations (1 par persona MNG) avec l'angle "${angle.slice(0,60)}..." ?`)) return;
+
+  try {
+    const res = await fetch('/api/generate/personas-batch', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        brand_id: state.currentBrand.id,
+        product_id: state.selectedProductId,
+        angle,
+        aspect_ratio: state.selectedFormats?.[0] || '4:5',
+        language: state.batchLanguage || 'fr',
+        formats: JSON.stringify(state.selectedFormats || ['4:5']),
+      }),
+    });
+    const data = await res.json();
+    alert(`✅ ${data.count} générations lancées (1 par persona). Va dans Studio pour suivre.`);
+    navigate('studio');
+  } catch (e) { alert('Erreur : ' + e.message); }
 }
 
 function mountStudioModals() {
-  let container = document.getElementById('modal-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'modal-container';
-    document.body.appendChild(container);
+  let modalContainer = document.getElementById('modal-container');
+  if (!modalContainer) {
+    modalContainer = document.createElement('div');
+    modalContainer.id = 'modal-container';
+    document.body.appendChild(modalContainer);
   }
-  container.innerHTML = (renderInsightModal() || '') + (renderVariantModal() || '') + (renderPersonaModal() || '');
+  modalContainer.innerHTML =
+    (typeof renderInsightModal === 'function' ? renderInsightModal() : '') +
+    (typeof renderVariantModal === 'function' ? renderVariantModal() : '') +
+    (typeof renderPersonaModal === 'function' ? renderPersonaModal() : '') +
+    (typeof renderHookGenModal === 'function' ? renderHookGenModal() : '') +
+    (typeof renderBriefAutoModal === 'function' ? renderBriefAutoModal() : '');
 }
 
 // ---- Init ----

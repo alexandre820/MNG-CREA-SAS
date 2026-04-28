@@ -513,7 +513,13 @@ def build_prompt(brand_dna: str, product_name: str, aspect_ratio: str,
 
     def _apply_language(prompt: str) -> str:
         if language and language != "fr":
-            return f"IMPORTANT: All text overlays and headlines must be in English.\n\n{prompt}"
+            prompt = f"IMPORTANT: All text overlays and headlines must be in English.\n\n{prompt}"
+        try:
+            bias = get_winner_bias_for_prompt()
+            if bias:
+                prompt = prompt + "\n" + bias
+        except NameError:
+            pass
         return prompt
 
     # Determine the angle
@@ -2764,6 +2770,551 @@ async def api_generate_naming(request: Request):
         version=int(data.get("version", 1)),
     )
     return {"naming": name}
+
+
+# =====================================================================
+# Wave 1B — AI Tagging engine + Brief auto (TrendTrack / Meta Ads Library)
+# =====================================================================
+
+TAG_CATEGORIES = {
+    "hook_type": ["pov", "question", "choc", "listicle", "prix", "social_proof", "comparison"],
+    "messaging_angle": ["ballonnements", "crash_energie", "focus", "stress", "alternative_cafe", "naturel", "sommeil", "performance"],
+    "visual_format": ["split", "listicle", "before_after", "mockup", "lifestyle", "studio_product", "ugc_screenshot", "color_block"],
+    "asset_type": ["static", "ugc", "studio", "motion_design", "talking_head"],
+    "offer": ["discount", "bundle", "free_trial", "free_shipping", "subscription", "no_offer"],
+    "seasonality": ["bfcm", "rentree", "ramadan", "summer", "winter", "newyear", "evergreen"],
+    "audience": ["entrepreneur", "active_woman", "student", "athlete", "general"],
+    "funnel_stage": ["tofu", "mofu", "bofu"],
+}
+
+
+def auto_tag_creative(prompt_text: str = "", filename: str = "", angle: str = "") -> dict:
+    """Tagging rule-based sur 8 categories a partir du prompt/naming/angle."""
+    text = (prompt_text + " " + filename + " " + angle).lower()
+    tags = {cat: [] for cat in TAG_CATEGORIES}
+
+    # Hook type detection
+    if "pov" in text or "point of view" in text: tags["hook_type"].append("pov")
+    if "?" in text or "pourquoi" in text or "comment " in text: tags["hook_type"].append("question")
+    if "stop" in text or "arrête" in text or "fini " in text: tags["hook_type"].append("choc")
+    if any(k in text for k in ["5 raisons", "3 erreurs", "top ", "listicle"]): tags["hook_type"].append("listicle")
+    if "€" in text or "%" in text or "prix" in text or "promo" in text: tags["hook_type"].append("prix")
+    if "20 000" in text or "trustpilot" in text or "avis" in text or "★" in text: tags["hook_type"].append("social_proof")
+    if "vs " in text or "comparé" in text or " versus " in text: tags["hook_type"].append("comparison")
+
+    # Messaging angle
+    angle_map = {
+        "ballonnement": "ballonnements", "ventre": "ballonnements", "digestion": "ballonnements",
+        "crash": "crash_energie", "energie": "crash_energie", "fatigue": "crash_energie",
+        "focus": "focus", "concentration": "focus", "productivité": "focus",
+        "stress": "stress", "anxiété": "stress", "cortisol": "stress",
+        "alternative au café": "alternative_cafe", "remplacer le café": "alternative_cafe",
+        "naturel": "naturel", "100%": "naturel", "bio": "naturel",
+        "sommeil": "sommeil", "dormir": "sommeil",
+        "performance": "performance", "sport": "performance",
+    }
+    for kw, t in angle_map.items():
+        if kw in text and t not in tags["messaging_angle"]:
+            tags["messaging_angle"].append(t)
+
+    # Visual format
+    if "split" in text or "before/after" in text or "avant/après" in text: tags["visual_format"].append("split")
+    if "listicle" in text or "bulles" in text or "bullet" in text: tags["visual_format"].append("listicle")
+    if "before" in text or "avant" in text and "après" in text: tags["visual_format"].append("before_after")
+    if "mockup" in text: tags["visual_format"].append("mockup")
+    if "lifestyle" in text or "ambiance" in text: tags["visual_format"].append("lifestyle")
+    if "studio" in text or "fond uniforme" in text: tags["visual_format"].append("studio_product")
+    if "selfie" in text or "facecam" in text or "ugc" in text: tags["visual_format"].append("ugc_screenshot")
+    if "fond couleur" in text or "color block" in text: tags["visual_format"].append("color_block")
+
+    # Asset type
+    if "ugc" in text or "facecam" in text or "selfie" in text: tags["asset_type"].append("ugc")
+    elif "studio" in text: tags["asset_type"].append("studio")
+    elif "talking head" in text or "interview" in text: tags["asset_type"].append("talking_head")
+    elif "motion" in text or "animation" in text: tags["asset_type"].append("motion_design")
+    else: tags["asset_type"].append("static")
+
+    # Offer
+    if "-" in text and "%" in text: tags["offer"].append("discount")
+    if "bundle" in text or "pack" in text: tags["offer"].append("bundle")
+    if "essai" in text or "trial" in text or "satisfait ou remboursé" in text: tags["offer"].append("free_trial")
+    if "livraison offerte" in text or "free shipping" in text: tags["offer"].append("free_shipping")
+    if "abonnement" in text or "subscription" in text: tags["offer"].append("subscription")
+    if not any(tags["offer"]): tags["offer"].append("no_offer")
+
+    # Seasonality (mostly evergreen)
+    if "bfcm" in text or "black friday" in text or "noël" in text: tags["seasonality"].append("bfcm")
+    elif "rentrée" in text or "back to school" in text: tags["seasonality"].append("rentree")
+    elif "ramadan" in text: tags["seasonality"].append("ramadan")
+    elif "été" in text or "summer" in text: tags["seasonality"].append("summer")
+    elif "hiver" in text or "winter" in text: tags["seasonality"].append("winter")
+    elif "nouvel an" in text or "new year" in text: tags["seasonality"].append("newyear")
+    else: tags["seasonality"].append("evergreen")
+
+    # Audience
+    if "entrepreneur" in text or "cadre" in text or "dirigeant" in text: tags["audience"].append("entrepreneur")
+    if "femme active" in text or "maman" in text or "ventre plat" in text: tags["audience"].append("active_woman")
+    if "étudiant" in text or "examens" in text or "fac" in text: tags["audience"].append("student")
+    if "sport" in text or "athlète" in text or "training" in text: tags["audience"].append("athlete")
+    if not any(tags["audience"]): tags["audience"].append("general")
+
+    # Funnel stage (heuristic)
+    if any(k in text for k in ["pourquoi", "savais-tu", "découvre", "pain point"]): tags["funnel_stage"].append("tofu")
+    elif any(k in text for k in ["vs", "compare", "alternative", "trust"]): tags["funnel_stage"].append("mofu")
+    elif any(k in text for k in ["essaie", "achète", "commande", "promo", "%"]): tags["funnel_stage"].append("bofu")
+    else: tags["funnel_stage"].append("mofu")
+
+    return tags
+
+
+@app.post("/api/auto-tag/{image_id}")
+async def auto_tag_image(image_id: str):
+    """Auto-tag d'une image a partir de son prompt."""
+    conn = get_db()
+    img = conn.execute("SELECT * FROM generated_images WHERE id=?", (image_id,)).fetchone()
+    if not img:
+        conn.close()
+        raise HTTPException(404)
+    tags = auto_tag_creative(prompt_text=img["prompt_used"] or "", filename=img["filename"] or "")
+    conn.execute("UPDATE generated_images SET tags=? WHERE id=?", (json.dumps(tags), image_id))
+    conn.commit()
+    conn.close()
+    return {"image_id": image_id, "tags": tags}
+
+
+@app.post("/api/auto-tag-all")
+async def auto_tag_all():
+    """Auto-tag toutes les images sans tags."""
+    conn = get_db()
+    rows = conn.execute("SELECT id, prompt_used, filename FROM generated_images WHERE tags='{}' OR tags IS NULL").fetchall()
+    count = 0
+    for r in rows:
+        tags = auto_tag_creative(prompt_text=r["prompt_used"] or "", filename=r["filename"] or "")
+        conn.execute("UPDATE generated_images SET tags=? WHERE id=?", (json.dumps(tags), r["id"]))
+        count += 1
+    conn.commit()
+    conn.close()
+    return {"tagged_count": count}
+
+
+@app.get("/api/tag-categories")
+async def get_tag_categories():
+    return TAG_CATEGORIES
+
+
+# ---------- Brief auto: TrendTrack ----------
+
+@app.post("/api/auto-brief/trendtrack")
+async def auto_brief_trendtrack(request: Request):
+    """
+    Extrait les infos creas d'une ad TrendTrack via son ad_id.
+    Body: {ad_id: "facebook_xxx", brand_id: "..."}
+    Retourne: copy, headline, visuel, tags detectes.
+    """
+    data = await request.json()
+    ad_id = data.get("ad_id", "").strip()
+    brand_id = data.get("brand_id", "")
+    if not ad_id:
+        raise HTTPException(400, "ad_id required")
+    if not TRENDTRACK_API_KEY:
+        raise HTTPException(503, "TrendTrack not configured")
+
+    headers = {"Authorization": f"Bearer {TRENDTRACK_API_KEY}"}
+    try:
+        r = requests.get(f"{TRENDTRACK_BASE}/v1/ads/{ad_id}", headers=headers, timeout=20)
+        r.raise_for_status()
+        d = r.json().get("data", r.json())
+    except Exception as e:
+        raise HTTPException(500, f"TrendTrack fetch failed: {e}")
+
+    ad = d.get("ad") or d
+    content = ad.get("content") or {}
+    media = ad.get("media") or {}
+    advertiser = ad.get("advertiser") or {}
+
+    extracted_copy = content.get("body", "")
+    extracted_headline = content.get("title") or content.get("ctaDescription") or ""
+    visual_url = media.get("thumbnailUrl", "")
+
+    # Auto-tag
+    detected_tags = auto_tag_creative(prompt_text=extracted_copy + " " + extracted_headline)
+
+    bid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO auto_briefs (id, brand_id, source_url, source_type, competitor_name, extracted_copy, extracted_headline, visual_path, detected_tags)
+        VALUES (?, ?, ?, 'trendtrack', ?, ?, ?, ?, ?)
+    """, (bid, brand_id, f"trendtrack://{ad_id}", advertiser.get("name", ""), extracted_copy, extracted_headline, visual_url, json.dumps(detected_tags)))
+    conn.commit()
+    conn.close()
+    return {
+        "id": bid,
+        "competitor_name": advertiser.get("name", ""),
+        "extracted_headline": extracted_headline,
+        "extracted_copy": extracted_copy,
+        "visual_url": visual_url,
+        "detected_tags": detected_tags,
+    }
+
+
+# ---------- Brief auto: Meta Ads Library (best-effort) ----------
+
+import re as _re
+
+
+@app.post("/api/auto-brief/meta-library")
+async def auto_brief_meta_library(request: Request):
+    """
+    Extrait les infos creas d'une URL Meta Ads Library (best-effort, Meta bloque souvent).
+    Body: {url, brand_id, screenshot_text (optional), competitor_name (optional)}
+    """
+    data = await request.json()
+    url = data.get("url", "").strip()
+    brand_id = data.get("brand_id", "")
+    screenshot_text = data.get("screenshot_text", "")
+    competitor_name = data.get("competitor_name", "")
+
+    if not url:
+        raise HTTPException(400, "url required")
+
+    # Try to extract brand from URL
+    brand_match = _re.search(r"q=([^&]+)", url)
+    if brand_match and not competitor_name:
+        competitor_name = brand_match.group(1).replace("%22", "").replace('"', '').strip()
+
+    # Try basic fetch — usually 403 but worth trying
+    extracted_copy = screenshot_text or ""
+    extracted_headline = ""
+    visual_url = ""
+    try:
+        r = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            html = r.text
+            # Try to find body text from JSON-LD or og:description
+            og_match = _re.search(r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)', html)
+            if og_match:
+                extracted_copy = extracted_copy or og_match.group(1)
+            img_match = _re.search(r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)', html)
+            if img_match:
+                visual_url = img_match.group(1)
+    except Exception:
+        pass
+
+    # If user provided screenshot text, take first short line as headline
+    if screenshot_text and not extracted_headline:
+        first_line = screenshot_text.strip().split("\n")[0]
+        extracted_headline = first_line[:150]
+
+    detected_tags = auto_tag_creative(prompt_text=extracted_copy + " " + extracted_headline)
+
+    bid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute("""
+        INSERT INTO auto_briefs (id, brand_id, source_url, source_type, competitor_name, extracted_copy, extracted_headline, visual_path, detected_tags)
+        VALUES (?, ?, ?, 'meta_ads_library', ?, ?, ?, ?, ?)
+    """, (bid, brand_id, url, competitor_name, extracted_copy, extracted_headline, visual_url, json.dumps(detected_tags)))
+    conn.commit()
+    conn.close()
+    return {
+        "id": bid,
+        "competitor_name": competitor_name,
+        "extracted_headline": extracted_headline,
+        "extracted_copy": extracted_copy,
+        "visual_url": visual_url,
+        "detected_tags": detected_tags,
+        "scraping_note": "Meta bloque souvent — colle un screenshot pour les infos manquantes" if not extracted_copy else None,
+    }
+
+
+# =============================================================================
+# Wave 1B — Performance feedback loop + Brand Intel hub
+# =============================================================================
+
+# Fallback stub for auto_tag_creative (kept for safety; real impl is at line ~2785)
+def auto_tag_creative_fallback(prompt_text="", filename="", angle=""):
+    return {}
+try:
+    auto_tag_creative
+except NameError:
+    auto_tag_creative = auto_tag_creative_fallback
+
+
+@app.post("/api/feedback-loop/sync")
+async def sync_feedback_loop():
+    """
+    Match Ad Doctor verdicts to generated_images by naming.
+    Auto-update status_tag based on MNG thresholds:
+      - CPA < 27 + purchases >= 5 → winner
+      - CPA > 45 OR (spend > 75 AND 0 purchase) → killed
+      - else: keep current status
+    Returns count of updated images + winning angles/personas.
+    """
+    data_path = DATA_DIR / "mng_top_7d.json"
+    if not data_path.exists():
+        return {"ok": False, "error": "No Ad Doctor data. Run /api/ad-doctor/refresh first."}
+
+    try:
+        ad_data = json.loads(data_path.read_text())
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    conn = get_db()
+    rows = conn.execute("SELECT id, naming, prompt_used FROM generated_images").fetchall()
+    naming_to_id = {(r["naming"] or "").lower(): r["id"] for r in rows if r["naming"]}
+
+    updated = 0
+    auto_winners = []
+    auto_killed = []
+
+    for ad in ad_data:
+        ad_name = (ad.get("ad_name") or "").lower()
+        if not ad_name:
+            continue
+        # Match by partial inclusion
+        matched_id = None
+        for naming, img_id in naming_to_id.items():
+            if naming and (naming in ad_name or ad_name in naming):
+                matched_id = img_id
+                break
+        if not matched_id:
+            continue
+
+        cpa = ad.get("cpa") or 0
+        purchases = ad.get("purchases", 0)
+        spend = ad.get("spend", 0)
+
+        new_status = None
+        if cpa and cpa != float('inf') and cpa < 27 and purchases >= 5:
+            new_status = "winner"
+            auto_winners.append({"image_id": matched_id, "ad_name": ad.get("ad_name"), "cpa": cpa})
+        elif (cpa and cpa > 45 and cpa != float('inf')) or (spend > 75 and purchases == 0):
+            new_status = "killed"
+            auto_killed.append({"image_id": matched_id, "ad_name": ad.get("ad_name"), "cpa": cpa})
+
+        if new_status:
+            conn.execute("UPDATE generated_images SET status_tag=? WHERE id=?", (new_status, matched_id))
+            updated += 1
+
+    conn.commit()
+    conn.close()
+    return {
+        "ok": True,
+        "updated_count": updated,
+        "auto_winners": auto_winners,
+        "auto_killed": auto_killed,
+    }
+
+
+@app.get("/api/feedback-loop/learnings")
+async def get_learnings(brand_id: Optional[str] = None):
+    """
+    Aggregate learnings from current winners (status_tag='winner') + expert insights.
+    Returns angle/persona/hook biases for prompt builder.
+    """
+    conn = get_db()
+    # Winners
+    winners = conn.execute("""
+        SELECT gi.id, gi.tags, gi.prompt_used, gi.persona_id, p.name as persona_name
+        FROM generated_images gi
+        LEFT JOIN personas p ON p.id=gi.persona_id
+        WHERE gi.status_tag='winner'
+    """).fetchall()
+
+    from collections import Counter
+    angle_counts = Counter()
+    hook_counts = Counter()
+    persona_counts = Counter()
+    visual_counts = Counter()
+
+    for w in winners:
+        try:
+            tags = json.loads(w["tags"] or "{}")
+            for a in tags.get("messaging_angle", []):
+                angle_counts[a] += 1
+            for h in tags.get("hook_type", []):
+                hook_counts[h] += 1
+            for v in tags.get("visual_format", []):
+                visual_counts[v] += 1
+        except Exception:
+            pass
+        if w["persona_name"]:
+            persona_counts[w["persona_name"]] += 1
+
+    # Expert insights
+    insights = conn.execute("SELECT pattern_type, why_it_works, source FROM expert_insights ORDER BY created_at DESC LIMIT 20").fetchall()
+
+    conn.close()
+
+    return {
+        "winner_count": len(winners),
+        "top_angles": [{"angle": a, "count": c} for a, c in angle_counts.most_common(5)],
+        "top_hooks": [{"hook": h, "count": c} for h, c in hook_counts.most_common(5)],
+        "top_personas": [{"persona": p, "count": c} for p, c in persona_counts.most_common(5)],
+        "top_visuals": [{"visual": v, "count": c} for v, c in visual_counts.most_common(5)],
+        "expert_insights": [{
+            "pattern_type": i["pattern_type"],
+            "source": i["source"],
+            "why_it_works": (i["why_it_works"] or "")[:300],
+        } for i in insights],
+    }
+
+
+def get_winner_bias_for_prompt(brand_id: str = None) -> str:
+    """Build a context string with winner learnings to inject in build_prompt()."""
+    try:
+        conn = get_db()
+        winners = conn.execute("SELECT tags FROM generated_images WHERE status_tag='winner'").fetchall()
+        from collections import Counter
+        angles = Counter()
+        hooks = Counter()
+        for w in winners:
+            try:
+                tags = json.loads(w["tags"] or "{}")
+                for a in tags.get("messaging_angle", []): angles[a] += 1
+                for h in tags.get("hook_type", []): hooks[h] += 1
+            except Exception:
+                pass
+        # Recent expert insights
+        insights = conn.execute("SELECT why_it_works FROM expert_insights ORDER BY created_at DESC LIMIT 5").fetchall()
+        conn.close()
+
+        if not winners and not insights:
+            return ""
+
+        bias_parts = []
+        if angles:
+            top_a = ", ".join(a for a, _ in angles.most_common(3))
+            bias_parts.append(f"Angles winners MNG (les + souvent gagnants): {top_a}")
+        if hooks:
+            top_h = ", ".join(h for h, _ in hooks.most_common(3))
+            bias_parts.append(f"Hook types winners: {top_h}")
+        if insights:
+            bias_parts.append("Insights expert: " + " | ".join((i["why_it_works"] or "")[:120] for i in insights[:3]))
+
+        return "\n\nLEARNINGS DES WINNERS MNG (à privilégier):\n" + "\n".join(bias_parts)
+    except Exception:
+        return ""
+
+
+# -----------------------------------------------------------------------------
+# Brand Intel Hub
+# -----------------------------------------------------------------------------
+
+@app.get("/api/brand-intel/{competitor_name}")
+async def get_brand_intel(competitor_name: str):
+    """
+    Aggregated patterns for a competitor brand from auto_briefs + recent TrendTrack data.
+    Returns: dominant hooks, angles, offers, formats, copy patterns.
+    """
+    from urllib.parse import unquote
+    competitor_name = unquote(competitor_name)
+    conn = get_db()
+
+    briefs = conn.execute("""
+        SELECT detected_tags, extracted_copy, extracted_headline
+        FROM auto_briefs
+        WHERE competitor_name LIKE ?
+        ORDER BY created_at DESC LIMIT 50
+    """, (f"%{competitor_name}%",)).fetchall()
+
+    from collections import Counter
+    hook_c = Counter()
+    angle_c = Counter()
+    offer_c = Counter()
+    visual_c = Counter()
+    headlines = []
+
+    for b in briefs:
+        try:
+            tags = json.loads(b["detected_tags"] or "{}")
+            for h in tags.get("hook_type", []): hook_c[h] += 1
+            for a in tags.get("messaging_angle", []): angle_c[a] += 1
+            for o in tags.get("offer", []): offer_c[o] += 1
+            for v in tags.get("visual_format", []): visual_c[v] += 1
+        except Exception:
+            pass
+        if b["extracted_headline"]:
+            headlines.append(b["extracted_headline"])
+
+    conn.close()
+
+    total = len(briefs)
+    return {
+        "competitor": competitor_name,
+        "total_creatives_analyzed": total,
+        "dominant_hooks": [{"hook": h, "count": c, "pct": round(c/total*100,1) if total else 0} for h, c in hook_c.most_common(5)],
+        "dominant_angles": [{"angle": a, "count": c, "pct": round(c/total*100,1) if total else 0} for a, c in angle_c.most_common(5)],
+        "dominant_offers": [{"offer": o, "count": c} for o, c in offer_c.most_common(3)],
+        "dominant_visuals": [{"visual": v, "count": c} for v, c in visual_c.most_common(5)],
+        "sample_headlines": headlines[:10],
+    }
+
+
+@app.get("/api/brand-intel")
+async def list_brand_intels():
+    """List all competitors that have intel collected."""
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT competitor_name, COUNT(*) as creative_count
+        FROM auto_briefs
+        WHERE competitor_name != ''
+        GROUP BY competitor_name
+        ORDER BY creative_count DESC
+    """).fetchall()
+    conn.close()
+    return [{"competitor": r["competitor_name"], "creative_count": r["creative_count"]} for r in rows]
+
+
+@app.post("/api/brand-intel/build")
+async def build_brand_intel(request: Request):
+    """
+    Pull all top-ads from a TrendTrack brandtracker and create auto_briefs for each.
+    Body: {brandtracker_id: "...", competitor_name: "..."}
+    """
+    data = await request.json()
+    btr_id = data.get("brandtracker_id", "")
+    name = data.get("competitor_name", "")
+    if not btr_id or not name:
+        raise HTTPException(400, "brandtracker_id + competitor_name required")
+    if not TRENDTRACK_API_KEY:
+        raise HTTPException(503, "TrendTrack not configured")
+
+    headers = {"Authorization": f"Bearer {TRENDTRACK_API_KEY}"}
+    try:
+        r = requests.get(
+            f"{TRENDTRACK_BASE}/v1/brandtrackers/{btr_id}/top-ads",
+            headers=headers,
+            params={"sortBy": "currentRank", "limit": 30, "mediaType": "image"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        items = r.json().get("data", []) or []
+    except Exception as e:
+        raise HTTPException(500, f"TrendTrack fetch failed: {e}")
+
+    conn = get_db()
+    count = 0
+    for item in items:
+        ad = item.get("ad") or {}
+        content = ad.get("content") or {}
+        media = ad.get("media") or {}
+        ad_id = ad.get("id", "")
+        # Skip if already exists
+        existing = conn.execute("SELECT id FROM auto_briefs WHERE source_url=?", (f"trendtrack://{ad_id}",)).fetchone()
+        if existing:
+            continue
+        copy = content.get("body", "") or ""
+        headline = content.get("title") or content.get("ctaDescription") or ""
+        tags = auto_tag_creative(prompt_text=copy + " " + headline)
+        bid = str(uuid.uuid4())
+        conn.execute("""
+            INSERT INTO auto_briefs (id, source_url, source_type, competitor_name, extracted_copy, extracted_headline, visual_path, detected_tags)
+            VALUES (?, ?, 'trendtrack', ?, ?, ?, ?, ?)
+        """, (bid, f"trendtrack://{ad_id}", name, copy, headline, media.get("thumbnailUrl", ""), json.dumps(tags)))
+        count += 1
+    conn.commit()
+    conn.close()
+    return {"ok": True, "competitor": name, "creatives_added": count, "total_in_response": len(items)}
 
 
 if __name__ == "__main__":
