@@ -11,6 +11,7 @@ import base64
 import json
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import time
@@ -164,6 +165,14 @@ def init_db():
         "ALTER TABLE generations ADD COLUMN language TEXT DEFAULT 'fr'",
         "ALTER TABLE generations ADD COLUMN formats TEXT DEFAULT '[\"4:5\"]'",
         "ALTER TABLE generations ADD COLUMN structure_id TEXT DEFAULT ''",
+        # Tagging + status + naming + persona linking
+        "ALTER TABLE generated_images ADD COLUMN tags TEXT DEFAULT '{}'",  # JSON: 8-cat tags
+        "ALTER TABLE generated_images ADD COLUMN status_tag TEXT DEFAULT 'draft'",  # draft|to_test|winner|killed
+        "ALTER TABLE generated_images ADD COLUMN naming TEXT DEFAULT ''",  # auto-generated naming convention
+        "ALTER TABLE generated_images ADD COLUMN variant_parent_id TEXT DEFAULT NULL",  # for A/B variants
+        "ALTER TABLE generated_images ADD COLUMN persona_id TEXT DEFAULT NULL",
+        "ALTER TABLE generations ADD COLUMN persona_id TEXT DEFAULT NULL",
+        "ALTER TABLE generations ADD COLUMN generation_kind TEXT DEFAULT 'standard'",  # standard|persona_batch|ab_variants|hook_gen
     ]:
         try:
             conn.execute(stmt)
@@ -207,6 +216,67 @@ def init_db():
             notes TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now'))
         );
+
+        -- Personas
+        CREATE TABLE IF NOT EXISTS personas (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            age_range TEXT DEFAULT '',
+            pain_points TEXT DEFAULT '[]',
+            desires TEXT DEFAULT '[]',
+            is_default INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Expert insights — comments on winners that train Expert Static skill
+        CREATE TABLE IF NOT EXISTS expert_insights (
+            id TEXT PRIMARY KEY,
+            brand_id TEXT,
+            image_id TEXT,
+            source TEXT DEFAULT 'mng',
+            competitor_name TEXT DEFAULT '',
+            why_it_works TEXT NOT NULL,
+            pattern_type TEXT DEFAULT '',
+            tags TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Auto briefs — extracted from Meta Ads Library / TrendTrack
+        CREATE TABLE IF NOT EXISTS auto_briefs (
+            id TEXT PRIMARY KEY,
+            brand_id TEXT,
+            source_url TEXT NOT NULL,
+            source_type TEXT DEFAULT 'meta_ads_library',
+            competitor_name TEXT DEFAULT '',
+            extracted_copy TEXT DEFAULT '',
+            extracted_headline TEXT DEFAULT '',
+            visual_path TEXT DEFAULT '',
+            detected_tags TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Snapshots — shareable reports
+        CREATE TABLE IF NOT EXISTS snapshots (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            type TEXT DEFAULT 'studio',
+            payload TEXT NOT NULL,
+            public_token TEXT UNIQUE,
+            is_live INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- AI Tasks — predefined query workflows
+        CREATE TABLE IF NOT EXISTS ai_tasks (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            query_kind TEXT NOT NULL,
+            last_run TEXT,
+            last_result TEXT DEFAULT '{}',
+            is_default INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
     """)
     conn.commit()
     conn.close()
@@ -235,6 +305,45 @@ def seed_mng_strategy():
             )
             conn.commit()
             print("[SEED] MNG strategy data created", flush=True)
+    conn.close()
+
+
+def seed_defaults():
+    """Seed 4 default personas + default AI tasks for MNG."""
+    conn = get_db()
+    # Personas
+    if conn.execute("SELECT COUNT(*) FROM personas").fetchone()[0] == 0:
+        defaults = [
+            (str(uuid.uuid4()), "Entrepreneur 30-45", "Cadre/dirigeant urbain, rythme intense, recherche focus + énergie sans crash", "30-45",
+             json.dumps(["stress chronique", "crash énergie 14h", "manque de focus", "fatigue mentale"]),
+             json.dumps(["focus stable 10h", "énergie sans nervosité", "alternative au 4ème café", "performance mentale"])),
+            (str(uuid.uuid4()), "Active Woman 28-40", "Nana active 28-40 qui fait tout bien (sport, alim) mais perd pas de ventre, problème digestion/ballonnements", "28-40",
+             json.dumps(["ballonnements", "ventre gonflé", "digestion lente", "stress qui touche l'intestin"]),
+             json.dumps(["ventre plat", "digestion fluide", "énergie stable", "naturel sans diète"])),
+            (str(uuid.uuid4()), "Étudiant stressé 18-28", "Étudiant en école/fac qui révise tard, anxiété + concentration", "18-28",
+             json.dumps(["anxiété examens", "concentration courte", "fatigue cognitive", "stress permanent"]),
+             json.dumps(["concentration longue", "calme mental", "mémorisation", "alternative red bull"])),
+            (str(uuid.uuid4()), "Sportif perfectionniste 25-45", "Sportif amateur/semi-pro qui veut perf + récup, alimentation propre", "25-45",
+             json.dumps(["récupération lente", "fatigue post-training", "ballonnements pré-séance", "manque de focus en compétition"]),
+             json.dumps(["récup rapide", "performance pic", "endurance mentale", "ingrédients clean label"])),
+        ]
+        for p in defaults:
+            conn.execute("INSERT INTO personas (id, name, description, age_range, pain_points, desires, is_default) VALUES (?,?,?,?,?,?,1)", p)
+        print("[SEED] Default personas created", flush=True)
+
+    # AI Tasks
+    if conn.execute("SELECT COUNT(*) FROM ai_tasks").fetchone()[0] == 0:
+        tasks = [
+            (str(uuid.uuid4()), "\U0001F4CA Quel angle convertit le mieux ce mois-ci ?", "best_angle"),
+            (str(uuid.uuid4()), "\U0001F465 Quelle persona scale le plus ?", "best_persona"),
+            (str(uuid.uuid4()), "\U0001F3A8 Mes UGC vs Statics : qui gagne ?", "ugc_vs_static"),
+            (str(uuid.uuid4()), "\U0001F3C6 Top 5 hooks de mes winners", "top_hooks"),
+        ]
+        for t in tasks:
+            conn.execute("INSERT INTO ai_tasks (id, name, query_kind, is_default) VALUES (?,?,?,1)", t)
+        print("[SEED] Default AI tasks created", flush=True)
+
+    conn.commit()
     conn.close()
 
 
@@ -707,6 +816,7 @@ TONE: {strategy['tone_of_voice']}"""
 async def lifespan(app: FastAPI):
     init_db()
     seed_mng_strategy()
+    seed_defaults()
     yield
 
 app = FastAPI(title="CreaFlow", lifespan=lifespan)
@@ -2111,6 +2221,549 @@ async def generate_batch_angles(
         time.sleep(0.5)  # Stagger slightly to avoid rate limits
 
     return {"gen_ids": gen_ids, "count": len(gen_ids)}
+
+
+# ===== Tags + Status + Naming =====
+
+@app.get("/api/generated-images/{image_id}/tags")
+async def get_image_tags(image_id: str):
+    conn = get_db()
+    row = conn.execute("SELECT tags, status_tag, naming, persona_id FROM generated_images WHERE id=?", (image_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404)
+    return {
+        "tags": json.loads(row["tags"] or "{}"),
+        "status_tag": row["status_tag"],
+        "naming": row["naming"],
+        "persona_id": row["persona_id"],
+    }
+
+
+@app.put("/api/generated-images/{image_id}/tags")
+async def update_image_tags(image_id: str, request: Request):
+    data = await request.json()
+    conn = get_db()
+    if "tags" in data:
+        conn.execute("UPDATE generated_images SET tags=? WHERE id=?", (json.dumps(data["tags"]), image_id))
+    if "status_tag" in data:
+        conn.execute("UPDATE generated_images SET status_tag=? WHERE id=?", (data["status_tag"], image_id))
+    if "naming" in data:
+        conn.execute("UPDATE generated_images SET naming=? WHERE id=?", (data["naming"], image_id))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ===== Personas =====
+
+@app.get("/api/personas")
+async def list_personas():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM personas ORDER BY is_default DESC, created_at ASC").fetchall()
+    conn.close()
+    return [{
+        "id": r["id"], "name": r["name"], "description": r["description"],
+        "age_range": r["age_range"],
+        "pain_points": json.loads(r["pain_points"] or "[]"),
+        "desires": json.loads(r["desires"] or "[]"),
+        "is_default": bool(r["is_default"]),
+    } for r in rows]
+
+
+@app.post("/api/personas")
+async def create_persona(request: Request):
+    data = await request.json()
+    pid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute("INSERT INTO personas (id, name, description, age_range, pain_points, desires) VALUES (?,?,?,?,?,?)",
+        (pid, data["name"], data.get("description", ""), data.get("age_range", ""),
+         json.dumps(data.get("pain_points", [])), json.dumps(data.get("desires", []))))
+    conn.commit()
+    conn.close()
+    return {"id": pid}
+
+
+@app.delete("/api/personas/{persona_id}")
+async def delete_persona(persona_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM personas WHERE id=? AND is_default=0", (persona_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ===== Expert Insights =====
+
+@app.get("/api/expert-insights")
+async def list_expert_insights(brand_id: Optional[str] = None, source: Optional[str] = None):
+    conn = get_db()
+    q = "SELECT * FROM expert_insights WHERE 1=1"
+    params = []
+    if brand_id:
+        q += " AND brand_id=?"
+        params.append(brand_id)
+    if source:
+        q += " AND source=?"
+        params.append(source)
+    q += " ORDER BY created_at DESC"
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/expert-insights")
+async def create_expert_insight(request: Request):
+    data = await request.json()
+    iid = str(uuid.uuid4())
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO expert_insights (id, brand_id, image_id, source, competitor_name, why_it_works, pattern_type, tags) VALUES (?,?,?,?,?,?,?,?)",
+        (iid, data.get("brand_id"), data.get("image_id"), data.get("source", "mng"),
+         data.get("competitor_name", ""), data["why_it_works"], data.get("pattern_type", ""),
+         json.dumps(data.get("tags", []))))
+    conn.commit()
+    conn.close()
+    return {"id": iid}
+
+
+@app.delete("/api/expert-insights/{insight_id}")
+async def delete_expert_insight(insight_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM expert_insights WHERE id=?", (insight_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ===== Auto Briefs =====
+
+@app.get("/api/auto-briefs")
+async def list_briefs(brand_id: Optional[str] = None):
+    conn = get_db()
+    q = "SELECT * FROM auto_briefs"
+    params = []
+    if brand_id:
+        q += " WHERE brand_id=?"
+        params.append(brand_id)
+    q += " ORDER BY created_at DESC LIMIT 100"
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.delete("/api/auto-briefs/{brief_id}")
+async def delete_brief(brief_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM auto_briefs WHERE id=?", (brief_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ===== Snapshots =====
+
+@app.get("/api/snapshots")
+async def list_snapshots():
+    conn = get_db()
+    rows = conn.execute("SELECT id, name, type, public_token, is_live, created_at FROM snapshots ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/snapshots")
+async def create_snapshot(request: Request):
+    data = await request.json()
+    sid = str(uuid.uuid4())
+    token = secrets.token_urlsafe(12)
+    conn = get_db()
+    conn.execute("INSERT INTO snapshots (id, name, type, payload, public_token, is_live) VALUES (?,?,?,?,?,?)",
+        (sid, data["name"], data.get("type", "studio"), json.dumps(data.get("payload", {})), token, int(data.get("is_live", 0))))
+    conn.commit()
+    conn.close()
+    return {"id": sid, "public_token": token, "url": f"/s/{token}"}
+
+
+@app.get("/s/{token}")
+async def get_public_snapshot(token: str):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM snapshots WHERE public_token=?", (token,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404)
+    payload = json.loads(row["payload"])
+    return JSONResponse({
+        "name": row["name"], "type": row["type"], "payload": payload,
+        "is_live": bool(row["is_live"]), "created_at": row["created_at"]
+    })
+
+
+@app.delete("/api/snapshots/{snapshot_id}")
+async def delete_snapshot(snapshot_id: str):
+    conn = get_db()
+    conn.execute("DELETE FROM snapshots WHERE id=?", (snapshot_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+# ===== AI Tasks =====
+
+@app.get("/api/ai-tasks")
+async def list_ai_tasks():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM ai_tasks ORDER BY is_default DESC, created_at ASC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ===== Export ZIP by tag =====
+
+@app.get("/api/export-zip")
+async def export_zip(status_tag: Optional[str] = None, brand_id: Optional[str] = None):
+    """Export all images matching filter as ZIP."""
+    import zipfile
+    import io
+    conn = get_db()
+    q = "SELECT id, filename, filepath FROM generated_images WHERE 1=1"
+    params = []
+    if status_tag:
+        q += " AND status_tag=?"
+        params.append(status_tag)
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for r in rows:
+            fp = Path(r["filepath"])
+            if fp.exists():
+                zf.write(fp, fp.name)
+    buf.seek(0)
+    from fastapi.responses import StreamingResponse
+    fname = f"creaflow_{status_tag or 'all'}_{datetime.now().strftime('%Y%m%d')}.zip"
+    return StreamingResponse(buf, media_type='application/zip', headers={
+        "Content-Disposition": f'attachment; filename="{fname}"'
+    })
+
+
+# ===========================================================================
+# Wave 1B — Generation logic (hooks, persona batch, A/B variants, AI tasks, naming)
+# ===========================================================================
+
+# ----- Hook generator -----
+
+HOOK_TYPOLOGIES = {
+    "pov": [
+        "POV: tu prends ton 4ème café et ton ventre te dit non",
+        "POV: tu te réveilles avec l'énergie d'un athlète sans café",
+    ],
+    "question": [
+        "Pourquoi 90% des entrepreneurs arrêtent leur café à 14h ?",
+        "Tu pensais que le café était sain ? Lis ça.",
+    ],
+    "choc": [
+        "Stop. Ton café est en train de te détruire.",
+        "Personne ne te dit ce qui se passe vraiment quand tu bois ton 4ème café.",
+    ],
+    "listicle": [
+        "5 raisons pour lesquelles ton café te ballonne (et la solution)",
+        "3 erreurs à éviter avec ta routine matinale",
+    ],
+    "prix": [
+        "0,87€ par tasse pour remplacer ton Starbucks à 5€",
+        "-20% cette semaine seulement sur le café le plus dosé de France",
+    ],
+}
+
+
+def label_map(t):
+    return {"pov": "🎬 POV", "question": "❓ Question", "choc": "⚡ Choc", "listicle": "📋 Listicle", "prix": "💰 Prix"}.get(t, t)
+
+
+@app.post("/api/generate-hooks")
+async def generate_hooks(request: Request):
+    """Génère 10 hooks (2 par typologie) à partir d'un angle + brand_dna."""
+    data = await request.json()
+    angle = data.get("angle", "").strip()
+    brand_dna = data.get("brand_dna", "")
+
+    # Pour MNG: adapte les hooks templates avec l'angle donné
+    angle_keywords = {
+        "ballonnements": {"problem": "ballonne", "fix": "digestion fluide", "audience": "femmes actives"},
+        "crash": {"problem": "crashe à 14h", "fix": "énergie stable 10h", "audience": "entrepreneurs"},
+        "focus": {"problem": "perds ton focus", "fix": "10h de focus laser", "audience": "créatifs"},
+        "stress": {"problem": "stress qui te ronge", "fix": "calme mental", "audience": "cadres"},
+        "default": {"problem": "café qui te détruit", "fix": "alternative qui marche", "audience": "tous"},
+    }
+    # Detect angle keyword
+    al = angle.lower()
+    kw_key = "default"
+    for k in ["ballonnement", "crash", "focus", "stress"]:
+        if k in al:
+            kw_key = k if k != "ballonnement" else "ballonnements"
+            break
+    kw = angle_keywords.get(kw_key, angle_keywords["default"])
+
+    hooks_by_type = {
+        "pov": [
+            f"POV: tu prends ton café et ton corps te dit '{kw['problem']}'",
+            f"POV: 1ère semaine sans café — {kw['fix']}",
+        ],
+        "question": [
+            f"Pourquoi {kw['audience']} arrêtent le café classique ?",
+            f"T'as déjà essayé un café qui te donne {kw['fix']} ?",
+        ],
+        "choc": [
+            f"Stop. Ton café te {kw['problem']}. Voici la solution.",
+            f"Le café que tu bois te coûte plus cher que tu crois ({kw['problem']}).",
+        ],
+        "listicle": [
+            f"5 raisons pour lesquelles ton café te {kw['problem']}",
+            f"3 trucs que les {kw['audience']} font différemment au petit-déj",
+        ],
+        "prix": [
+            f"0,87€ la tasse pour {kw['fix']}",
+            f"-20% cette semaine sur le café le + dosé de France",
+        ],
+    }
+
+    return {
+        "angle": angle,
+        "hooks": [
+            {"type": t, "label": label_map(t), "text": txt}
+            for t, txts in hooks_by_type.items()
+            for txt in txts
+        ],
+    }
+
+
+# ----- Personas batch generation -----
+
+@app.post("/api/generate/personas-batch")
+async def generate_personas_batch(request: Request):
+    """
+    Lance 1 génération par persona (par défaut les 4 personas).
+    Body: {brand_id, product_id, angle, persona_ids: [...], aspect_ratio, language, formats}
+    Retourne la liste des generation_id créés.
+    """
+    data = await request.json()
+    brand_id = data.get("brand_id")
+    product_id = data.get("product_id")
+    angle = data.get("angle", "")
+    persona_ids = data.get("persona_ids", [])
+    aspect = data.get("aspect_ratio", "4:5")
+    lang = data.get("language", "fr")
+    formats_json = data.get("formats", '["4:5"]')
+
+    if not brand_id:
+        raise HTTPException(400, "brand_id required")
+
+    conn = get_db()
+    if not persona_ids:
+        # Default: all default personas
+        rows = conn.execute("SELECT id FROM personas WHERE is_default=1").fetchall()
+        persona_ids = [r["id"] for r in rows]
+
+    gen_ids = []
+    for pid in persona_ids:
+        prow = conn.execute("SELECT * FROM personas WHERE id=?", (pid,)).fetchone()
+        if not prow:
+            continue
+        gid = str(uuid.uuid4())
+        # Tailor angle to persona
+        persona_context = f"Persona ciblée : {prow['name']} ({prow['age_range']}). Pain points: {', '.join(json.loads(prow['pain_points'] or '[]')[:3])}. Désirs: {', '.join(json.loads(prow['desires'] or '[]')[:3])}."
+        custom = f"{angle}\n\nADAPTE LE MESSAGE À CETTE PERSONA: {persona_context}"
+
+        conn.execute("""
+            INSERT INTO generations (id, brand_id, product_id, status, num_creations, aspect_ratio, custom_prompt, language, formats, persona_id, generation_kind)
+            VALUES (?, ?, ?, 'pending', 1, ?, ?, ?, ?, ?, 'persona_batch')
+        """, (gid, brand_id, product_id, aspect, custom, lang, formats_json, pid))
+        gen_ids.append(gid)
+        # Launch background generation
+        Thread(target=run_generation, args=(gid,), daemon=True).start()
+    conn.commit()
+    conn.close()
+    return {"generation_ids": gen_ids, "count": len(gen_ids)}
+
+
+# ----- A/B variants generation -----
+
+@app.post("/api/generate/ab-variants")
+async def generate_ab_variants(request: Request):
+    """
+    Crée N variantes d'une image existante (subtle changes).
+    Body: {parent_image_id, count: 5}
+    """
+    data = await request.json()
+    parent_image_id = data.get("parent_image_id")
+    count = int(data.get("count", 5))
+
+    conn = get_db()
+    parent = conn.execute("SELECT gi.*, g.brand_id, g.product_id, g.aspect_ratio, g.language, g.formats FROM generated_images gi JOIN generations g ON gi.generation_id=g.id WHERE gi.id=?", (parent_image_id,)).fetchone()
+    if not parent:
+        conn.close()
+        raise HTTPException(404)
+
+    variant_instructions = [
+        "Variante 1 — Change la couleur de fond (autre teinte de la palette MNG)",
+        "Variante 2 — Repositionne le headline (haut → bas, ou centre)",
+        "Variante 3 — Change le CTA (couleur ou wording subtil)",
+        "Variante 4 — Variation typo headline (poids, italique, taille)",
+        "Variante 5 — Variation cadrage produit (close-up vs lifestyle)",
+        "Variante 6 — Ajout d'un trust badge supplémentaire",
+        "Variante 7 — Variation arrière-plan (uni vs texturé)",
+        "Variante 8 — Repositionnement éléments secondaires (bullets, étoiles)",
+        "Variante 9 — Changement d'éclairage (soft vs contrast)",
+        "Variante 10 — Variation accent color sur un mot-clé",
+    ][:count]
+
+    gen_ids = []
+    for instr in variant_instructions:
+        gid = str(uuid.uuid4())
+        custom = f"VARIANTE A/B (Andromeda-safe): {instr}\n\nGarde la même structure générale et le même message que la créa parent. Change UNIQUEMENT l'élément demandé."
+        conn.execute("""
+            INSERT INTO generations (id, brand_id, product_id, status, num_creations, aspect_ratio, custom_prompt, language, formats, generation_kind)
+            VALUES (?, ?, ?, 'pending', 1, ?, ?, ?, ?, 'ab_variants')
+        """, (gid, parent["brand_id"], parent["product_id"], parent["aspect_ratio"], custom, parent["language"], parent["formats"]))
+        # Save parent_id on the future image (we'll pass via the threading)
+        Thread(target=_run_ab_variant, args=(gid, parent_image_id), daemon=True).start()
+        gen_ids.append(gid)
+    conn.commit()
+    conn.close()
+    return {"generation_ids": gen_ids, "count": len(gen_ids), "parent_image_id": parent_image_id}
+
+
+def _run_ab_variant(gen_id: str, parent_image_id: str):
+    """Wrapper that runs run_generation then sets variant_parent_id on the new image."""
+    run_generation(gen_id)
+    try:
+        conn = get_db()
+        # Find images for this generation
+        imgs = conn.execute("SELECT id FROM generated_images WHERE generation_id=?", (gen_id,)).fetchall()
+        for img in imgs:
+            conn.execute("UPDATE generated_images SET variant_parent_id=? WHERE id=?", (parent_image_id, img["id"]))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[ab_variant] failed to set parent: {e}")
+
+
+# ----- AI Tasks runner -----
+
+@app.post("/api/ai-tasks/{task_id}/run")
+async def run_ai_task(task_id: str):
+    """Execute a predefined AI task and return results."""
+    conn = get_db()
+    task = conn.execute("SELECT * FROM ai_tasks WHERE id=?", (task_id,)).fetchone()
+    if not task:
+        conn.close()
+        raise HTTPException(404)
+
+    kind = task["query_kind"]
+    result = {}
+
+    if kind == "best_angle":
+        # Group winners by detected angle (from prompt_used)
+        rows = conn.execute("""
+            SELECT gi.id, gi.prompt_used, gi.status_tag
+            FROM generated_images gi
+            WHERE gi.status_tag IN ('winner', 'to_test')
+        """).fetchall()
+        from collections import Counter
+        angles = Counter()
+        for r in rows:
+            p = (r["prompt_used"] or "").lower()
+            for a in ["ballonnements", "crash", "focus", "stress", "digestion", "énergie"]:
+                if a in p:
+                    angles[a] += 1
+                    break
+        result = {
+            "ranked_angles": [{"angle": a, "count": c} for a, c in angles.most_common()],
+            "winner_angle": angles.most_common(1)[0][0] if angles else None,
+            "total_winners": sum(angles.values()),
+        }
+
+    elif kind == "best_persona":
+        rows = conn.execute("""
+            SELECT g.persona_id, p.name, COUNT(*) as cnt
+            FROM generations g
+            JOIN generated_images gi ON gi.generation_id=g.id
+            LEFT JOIN personas p ON p.id=g.persona_id
+            WHERE gi.status_tag='winner' AND g.persona_id IS NOT NULL
+            GROUP BY g.persona_id
+            ORDER BY cnt DESC
+        """).fetchall()
+        result = {"ranked_personas": [{"persona_id": r["persona_id"], "name": r["name"], "winner_count": r["cnt"]} for r in rows]}
+
+    elif kind == "ugc_vs_static":
+        # Detect UGC vs static from prompts
+        rows = conn.execute("""
+            SELECT gi.prompt_used, gi.status_tag
+            FROM generated_images gi WHERE gi.status_tag IN ('winner', 'killed')
+        """).fetchall()
+        ugc_winners = ugc_total = static_winners = static_total = 0
+        for r in rows:
+            p = (r["prompt_used"] or "").lower()
+            is_ugc = any(k in p for k in ["face cam", "ugc", "selfie", "talking head"])
+            if is_ugc:
+                ugc_total += 1
+                if r["status_tag"] == "winner": ugc_winners += 1
+            else:
+                static_total += 1
+                if r["status_tag"] == "winner": static_winners += 1
+        result = {
+            "ugc": {"winners": ugc_winners, "total": ugc_total, "win_rate": round(ugc_winners/ugc_total*100, 1) if ugc_total else 0},
+            "static": {"winners": static_winners, "total": static_total, "win_rate": round(static_winners/static_total*100, 1) if static_total else 0},
+            "winner_format": "static" if (static_total and (static_winners/static_total) > (ugc_winners/max(ugc_total,1))) else "ugc",
+        }
+
+    elif kind == "top_hooks":
+        # Top hook patterns from winners + expert insights
+        insights = conn.execute("SELECT why_it_works FROM expert_insights WHERE pattern_type='hook_pattern' ORDER BY created_at DESC LIMIT 10").fetchall()
+        result = {
+            "top_hooks": [r["why_it_works"][:200] for r in insights],
+            "count": len(insights),
+        }
+
+    # Update task last_run
+    conn.execute("UPDATE ai_tasks SET last_run=datetime('now'), last_result=? WHERE id=?",
+        (json.dumps(result), task_id))
+    conn.commit()
+    conn.close()
+    return {"task": dict(task), "result": result}
+
+
+# ----- Naming convention generator -----
+
+def generate_naming(brand_name: str = "MNG", product_name: str = "", hook_type: str = "", angle: str = "", persona: str = "", aspect: str = "", version: int = 1) -> str:
+    """Generate Meta-friendly ad name: MNG_Brainstoorm_PainPoint_Ballonnements_FRwoman28-40_4-5_v1_2026-04-28"""
+    parts = [
+        brand_name,
+        (product_name or "Brainstoorm").replace(" ", ""),
+        hook_type or "Pain",
+        (angle or "")[:30].replace(" ", ""),
+        (persona or "")[:25].replace(" ", "-"),
+        aspect.replace(":", "-") if aspect else "4-5",
+        f"v{version}",
+        datetime.now().strftime("%Y%m%d"),
+    ]
+    return "_".join(p for p in parts if p).strip("_")
+
+
+@app.post("/api/generate-naming")
+async def api_generate_naming(request: Request):
+    data = await request.json()
+    name = generate_naming(
+        brand_name=data.get("brand_name", "MNG"),
+        product_name=data.get("product_name", ""),
+        hook_type=data.get("hook_type", ""),
+        angle=data.get("angle", ""),
+        persona=data.get("persona", ""),
+        aspect=data.get("aspect", "4:5"),
+        version=int(data.get("version", 1)),
+    )
+    return {"naming": name}
 
 
 if __name__ == "__main__":

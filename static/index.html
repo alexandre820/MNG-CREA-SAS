@@ -1297,6 +1297,184 @@ body {
   color: white;
   border-color: var(--accent);
 }
+
+/* ---- Studio status badges ---- */
+.status-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2;
+  text-transform: uppercase;
+}
+.status-badge.draft { background: rgba(255,255,255,0.15); color: var(--text2); }
+.status-badge.to_test { background: rgba(59,130,246,0.85); color: white; }
+.status-badge.winner { background: rgba(16,185,129,0.95); color: white; }
+.status-badge.killed { background: rgba(244,63,94,0.85); color: white; }
+
+/* Quick status dropdown on the card */
+.status-quick-menu {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(18,18,26,0.95);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xs);
+  padding: 4px;
+  min-width: 130px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.studio-card-wrapper:hover .status-quick-menu { display: flex; }
+.status-quick-menu button {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 11px;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.status-quick-menu button:hover {
+  background: var(--glass2);
+  color: var(--text);
+}
+.status-quick-menu button.active {
+  background: var(--accent-soft);
+  color: var(--accent-solid);
+}
+
+/* Tag badges below the image */
+.studio-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+.studio-tag {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: var(--glass2);
+  color: var(--text2);
+  border: 1px solid var(--glass-border);
+}
+
+/* Quick action buttons (variantes / personas / insight) */
+.image-card .quick-actions {
+  display: none;
+  gap: 4px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
+.studio-card-wrapper:hover .quick-actions { display: flex; }
+.image-card .quick-actions button,
+.studio-card-wrapper .quick-actions button {
+  font-size: 10px;
+  padding: 4px 8px;
+  background: var(--glass2);
+  color: var(--text2);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+.image-card .quick-actions button:hover,
+.studio-card-wrapper .quick-actions button:hover {
+  background: var(--accent-soft);
+  color: var(--accent-solid);
+  border-color: var(--accent-solid);
+}
+
+/* Studio header action buttons row */
+.studio-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- Studio modals (distinct from existing .modal) ---- */
+.studio-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.studio-modal-content {
+  background: var(--bg2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  max-width: 520px;
+  width: 100%;
+  padding: 28px;
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+.studio-modal-content h2 {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.studio-modal-content p { color: var(--text2); font-size: 13px; line-height: 1.5; }
+.studio-modal-content textarea,
+.studio-modal-content input[type="number"],
+.studio-modal-content input[type="text"],
+.studio-modal-content select {
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  transition: border var(--transition);
+}
+.studio-modal-content textarea {
+  min-height: 110px;
+  resize: vertical;
+}
+.studio-modal-content textarea:focus,
+.studio-modal-content input:focus,
+.studio-modal-content select:focus {
+  outline: none;
+  border-color: var(--accent-solid);
+  background: var(--glass2);
+}
+.studio-modal-content .modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+.studio-modal-content label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text2);
+  font-size: 12px;
+}
 </style>
 </head>
 <body>
@@ -1401,9 +1579,20 @@ let state = {
   batchLanguage: 'fr',
   selectedFormats: ['4:5'],
   studioFilter: null,
+  studioStatusFilter: 'all',  // all | draft | to_test | winner | killed
+  studioPersonaFilter: 'all',
+  studioBatchFilter: 'all',
+  studioImages: [],
   selectedStructure: null,
   structures: [],
   anglePresets: {},
+  // Modal state
+  showInsightModal: false,
+  showVariantModal: false,
+  showPersonaModal: false,
+  insightImageId: null,
+  variantSourceImageId: null,
+  personaSourceImageId: null,
 };
 
 // Polling for active generations
@@ -1439,6 +1628,8 @@ function renderPage() {
     console.error('Render error:', e);
     main.innerHTML = `<div style="color:red;padding:40px;"><h2>Erreur de rendu: ${currentPage}</h2><pre>${e.message}\n${e.stack}</pre></div>`;
   }
+  // Mount studio modals as overlays at body level (any page)
+  try { mountStudioModals(); } catch (e) { console.warn('mountStudioModals failed:', e); }
 }
 
 // ---- API helpers ----
@@ -2305,15 +2496,51 @@ function renderStudio(el) {
   const allImages = gens.flatMap(g => g.images.map(img => ({ ...img, gen: g })));
   const activeGens = gens.filter(g => g.status === 'pending' || g.status === 'generating');
 
+  // Mirror flat images list onto state for setImageStatus / mutations
+  state.studioImages = allImages;
+
   if (activeGens.length > 0) startPolling();
 
-  // Filter images per batch based on studioFilter
-  const filterImages = (images) => {
-    if (!state.studioFilter) return images;
-    if (state.studioFilter === 'winner') return images.filter(img => img.rating === 'winner');
-    if (state.studioFilter === 'kill') return images.filter(img => img.rating === 'kill');
-    if (state.studioFilter === 'unrated') return images.filter(img => !img.rating);
-    return images;
+  // Status filter (status_tag from API: draft / to_test / winner / killed)
+  // Backward compat: legacy `rating` field maps to winner / killed.
+  const getStatus = (img) => {
+    if (img.status_tag) return img.status_tag;
+    if (img.rating === 'winner') return 'winner';
+    if (img.rating === 'kill') return 'killed';
+    return 'draft';
+  };
+
+  const matchesStatus = (img) => {
+    if (state.studioStatusFilter === 'all') return true;
+    return getStatus(img) === state.studioStatusFilter;
+  };
+
+  // Legacy filter kept for compat with rateImage flow
+  const matchesLegacy = (img) => {
+    if (!state.studioFilter) return true;
+    if (state.studioFilter === 'winner') return img.rating === 'winner';
+    if (state.studioFilter === 'kill') return img.rating === 'kill';
+    if (state.studioFilter === 'unrated') return !img.rating;
+    return true;
+  };
+
+  const filterImages = (images) => images.filter(img => matchesStatus(img) && matchesLegacy(img));
+
+  // Counts for status pills
+  const counts = { all: allImages.length, draft: 0, to_test: 0, winner: 0, killed: 0 };
+  allImages.forEach(img => { counts[getStatus(img)] = (counts[getStatus(img)] || 0) + 1; });
+
+  const statusPill = (value, label) => `
+    <button class="pill ${state.studioStatusFilter === value ? 'active' : ''}"
+      onclick="state.studioStatusFilter='${value}';renderPage()">
+      ${label} <span style="opacity:0.6;margin-left:4px;">${counts[value] || 0}</span>
+    </button>
+  `;
+
+  const statusBadge = (img) => {
+    const s = getStatus(img);
+    const labels = { draft: 'Draft', to_test: 'A tester', winner: 'Winner', killed: 'Killed' };
+    return `<span class="status-badge ${s}">${labels[s] || s}</span>`;
   };
 
   el.innerHTML = `
@@ -2322,13 +2549,19 @@ function renderStudio(el) {
         <h1><em>Studio</em></h1>
         <p>Creations (${allImages.length})</p>
       </div>
-      <div style="display:flex;gap:8px;">
+      <div class="studio-header-actions">
         <button class="btn btn-primary" onclick="navigate('generate')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-          Generer des nouvelles creas
+          Generer
         </button>
         ${allImages.length > 0 ? `
-          <button class="btn btn-secondary" onclick="downloadAllImages()">Tout telecharger</button>
+          <button class="btn btn-secondary" onclick="exportStudioZip()" title="Export ZIP des creas filtrees">
+            ZIP
+          </button>
+          <button class="btn btn-secondary" onclick="openCompareReport()" title="Rapport comparatif">
+            Compare
+          </button>
+          <button class="btn btn-ghost" onclick="downloadAllImages()">Tout DL</button>
         ` : ''}
       </div>
     </div>
@@ -2343,15 +2576,19 @@ function renderStudio(el) {
       </div>
     ` : ''}
 
-    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
-      <button class="pill ${!state.studioFilter ? 'active' : ''}" onclick="state.studioFilter=null;renderPage()">Tous</button>
-      <button class="pill ${state.studioFilter==='winner' ? 'active' : ''}" onclick="state.studioFilter='winner';renderPage()">Winners</button>
-      <button class="pill ${state.studioFilter==='kill' ? 'active' : ''}" onclick="state.studioFilter='kill';renderPage()">Kills</button>
-      <button class="pill ${state.studioFilter==='unrated' ? 'active' : ''}" onclick="state.studioFilter='unrated';renderPage()">Non notes</button>
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+      ${statusPill('all', 'Tous')}
+      ${statusPill('draft', 'Drafts')}
+      ${statusPill('to_test', 'A tester')}
+      ${statusPill('winner', 'Winners')}
+      ${statusPill('killed', 'Killed')}
     </div>
 
     ${gens.length > 0 ? `
-      ${gens.map(g => `
+      ${gens.map(g => {
+        const visible = filterImages(g.images);
+        if (visible.length === 0 && g.status !== 'generating' && g.status !== 'pending') return '';
+        return `
         <div style="margin-bottom:28px;">
           <div class="batch-header" style="display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:10px;">
@@ -2359,19 +2596,21 @@ function renderStudio(el) {
               <div class="batch-meta">
                 <span class="badge badge-${g.status}" style="position:static;">${g.status === 'completed' ? 'Termine' : g.status === 'generating' ? 'En cours' : g.status === 'failed' ? 'Echoue' : 'En attente'}</span>
                 <span>${g.aspect_ratio || '4:5'}</span>
-                <span>${g.images.length} image(s)</span>
+                <span>${visible.length}/${g.images.length} image(s)</span>
               </div>
             </div>
             <button class="btn btn-ghost btn-danger" onclick="deleteGeneration('${g.id}')" style="font-size:11px;padding:4px 10px;">Supprimer</button>
           </div>
           <div class="studio-grid">
-            ${filterImages(g.images).map(img => `
+            ${visible.map(img => {
+              const status = getStatus(img);
+              const tags = Array.isArray(img.tags) ? img.tags : (img.tags ? [img.tags] : []);
+              return `
               <div class="studio-card-wrapper ${img.rating === 'winner' ? 'winner-card' : ''}${img.rating === 'kill' ? 'kill-card' : ''}">
                 <div class="image-card" onclick="openLightbox('/api/image/${img.id}')" style="position:relative;">
                   <img src="/api/image/${img.id}" alt="${img.filename}" loading="lazy">
+                  ${statusBadge(img)}
                   <span class="badge-ratio">${g.aspect_ratio || '4:5'}</span>
-                  ${img.rating === 'winner' ? '<span style="position:absolute;top:8px;right:8px;background:#22c55e;color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;z-index:2;">WINNER</span>' : ''}
-                  ${img.rating === 'kill' ? '<span style="position:absolute;top:8px;right:8px;background:#ef4444;color:#fff;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;z-index:2;">KILL</span>' : ''}
                   <div class="overlay">
                     <div class="actions" style="flex-wrap:wrap;gap:4px;">
                       <button onclick="event.stopPropagation(); rateImage('${img.id}', 'winner')" style="background:rgba(34,197,94,0.85);">Winner</button>
@@ -2382,6 +2621,22 @@ function renderStudio(el) {
                     </div>
                   </div>
                 </div>
+                <div class="status-quick-menu" onclick="event.stopPropagation()">
+                  <button class="${status === 'draft' ? 'active' : ''}" onclick="setImageStatus('${img.id}','draft')">Draft</button>
+                  <button class="${status === 'to_test' ? 'active' : ''}" onclick="setImageStatus('${img.id}','to_test')">A tester</button>
+                  <button class="${status === 'winner' ? 'active' : ''}" onclick="setImageStatus('${img.id}','winner')">Winner</button>
+                  <button class="${status === 'killed' ? 'active' : ''}" onclick="setImageStatus('${img.id}','killed')">Killed</button>
+                </div>
+                ${tags.length > 0 ? `
+                  <div class="studio-tags-row">
+                    ${tags.map(t => `<span class="studio-tag">${t}</span>`).join('')}
+                  </div>
+                ` : ''}
+                <div class="quick-actions" onclick="event.stopPropagation()">
+                  <button onclick="generateVariants('${img.id}')" title="Generer 5 variantes A/B">Variantes</button>
+                  <button onclick="generatePersonas('${img.id}')" title="4 versions par persona">Personas</button>
+                  <button onclick="openInsightModal('${img.id}')" title="Pourquoi ca marche">Insight</button>
+                </div>
                 <div class="image-comment" onclick="event.stopPropagation()">
                   <input type="text"
                     data-comment-id="${img.id}"
@@ -2391,7 +2646,7 @@ function renderStudio(el) {
                     onclick="event.stopPropagation()">
                 </div>
               </div>
-            `).join('')}
+            `;}).join('')}
             ${g.status === 'generating' || g.status === 'pending' ? `
               <div style="min-height:200px;border:2px dashed var(--border);border-radius:var(--radius);display:flex;align-items:center;justify-content:center;">
                 <div class="spinner"></div>
@@ -2399,7 +2654,7 @@ function renderStudio(el) {
             ` : ''}
           </div>
         </div>
-      `).join('')}
+      `;}).join('')}
     ` : `
       <div class="empty-state" style="padding-top:80px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
@@ -3537,6 +3792,192 @@ document.addEventListener('keydown', (e) => {
     closeModal();
   }
 });
+
+// ============================================================
+// Studio actions: status, export, variants, personas, insights
+// ============================================================
+
+async function setImageStatus(imageId, statusTag) {
+  try {
+    const resp = await fetch(`/api/generated-images/${imageId}/tags`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status_tag: statusTag})
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Erreur API');
+    }
+  } catch (e) {
+    console.warn('setImageStatus API erreur, MAJ locale uniquement:', e.message);
+  }
+  // Update flat list
+  state.studioImages = (state.studioImages || []).map(img =>
+    img.id === imageId ? { ...img, status_tag: statusTag } : img
+  );
+  // Update nested generations.images so re-render reflects new status
+  state.generations = (state.generations || []).map(g => ({
+    ...g,
+    images: g.images.map(img =>
+      img.id === imageId ? { ...img, status_tag: statusTag } : img
+    )
+  }));
+  renderPage();
+}
+
+async function exportStudioZip() {
+  const filter = state.studioStatusFilter !== 'all' ? state.studioStatusFilter : null;
+  const url = '/api/export-zip' + (filter ? `?status_tag=${encodeURIComponent(filter)}` : '');
+  window.location.href = url;
+}
+
+function openCompareReport() {
+  const filter = state.studioStatusFilter !== 'all' ? state.studioStatusFilter : null;
+  const url = '/api/compare-report' + (filter ? `?status_tag=${encodeURIComponent(filter)}` : '');
+  window.open(url, '_blank');
+}
+
+function generateVariants(imageId) {
+  state.variantSourceImageId = imageId;
+  state.showVariantModal = true;
+  renderPage();
+}
+
+function generatePersonas(imageId) {
+  state.personaSourceImageId = imageId;
+  state.showPersonaModal = true;
+  renderPage();
+}
+
+function openInsightModal(imageId) {
+  state.insightImageId = imageId;
+  state.showInsightModal = true;
+  renderPage();
+}
+
+async function saveExpertInsight() {
+  const text = document.getElementById('insight-text')?.value;
+  const patternType = document.getElementById('insight-pattern')?.value || 'hook_pattern';
+  if (!text || !text.trim()) {
+    alert('Decris pourquoi ca marche');
+    return;
+  }
+  try {
+    const resp = await fetch('/api/expert-insights', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        brand_id: state.currentBrand?.id,
+        image_id: state.insightImageId,
+        source: 'mng',
+        why_it_works: text,
+        pattern_type: patternType,
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'Erreur API');
+    }
+    state.showInsightModal = false;
+    renderPage();
+    alert('Insight ajoute a Expert Static');
+  } catch (e) {
+    alert('Erreur: ' + e.message);
+  }
+}
+
+// ---- Modal renderers ----
+function renderInsightModal() {
+  if (!state.showInsightModal) return '';
+  return `
+    <div class="studio-modal-overlay" onclick="if(event.target.classList.contains('studio-modal-overlay')){state.showInsightModal=false;renderPage();}">
+      <div class="studio-modal-content">
+        <h2>Pourquoi cette crea marche ?</h2>
+        <p style="margin-bottom:16px;">
+          Ton insight nourrit le skill <strong>Expert Static</strong> et ameliore les futures generations.
+        </p>
+        <label>Type de pattern</label>
+        <select id="insight-pattern" style="margin-bottom:12px;">
+          <option value="hook_pattern">Pattern de hook</option>
+          <option value="layout">Layout / composition</option>
+          <option value="copy">Copy / wording</option>
+          <option value="offer">Offre / prix</option>
+        </select>
+        <label>Insight</label>
+        <textarea id="insight-text" placeholder="Ex: Le hook 'Pourquoi les entrepreneurs arretent leur 4eme cafe' marche parce qu'il flatte l'identification + cree une curiosite immediate..."></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="state.showInsightModal=false;renderPage()">Annuler</button>
+          <button class="btn btn-primary" onclick="saveExpertInsight()">Sauver l'insight</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderVariantModal() {
+  if (!state.showVariantModal) return '';
+  return `
+    <div class="studio-modal-overlay" onclick="if(event.target.classList.contains('studio-modal-overlay')){state.showVariantModal=false;renderPage();}">
+      <div class="studio-modal-content">
+        <h2>Generer des variantes A/B</h2>
+        <p style="margin-bottom:16px;">
+          Variantes subtiles (couleur, headline, CTA position) — Andromeda-safe
+        </p>
+        <label>Nombre de variantes</label>
+        <input type="number" id="variant-count" value="5" min="2" max="10" style="margin-bottom:16px;">
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="state.showVariantModal=false;renderPage()">Annuler</button>
+          <button class="btn btn-primary" onclick="launchVariantGeneration()">Generer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderPersonaModal() {
+  if (!state.showPersonaModal) return '';
+  return `
+    <div class="studio-modal-overlay" onclick="if(event.target.classList.contains('studio-modal-overlay')){state.showPersonaModal=false;renderPage();}">
+      <div class="studio-modal-content">
+        <h2>Generer pour 4 personas</h2>
+        <p style="margin-bottom:16px;">
+          Meme angle, 4 versions adaptees a chaque persona MNG
+        </p>
+        <div id="persona-checkboxes" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          <em style="color:var(--text3);font-size:12px;">Chargement personas...</em>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="state.showPersonaModal=false;renderPage()">Annuler</button>
+          <button class="btn btn-primary" onclick="launchPersonaGeneration()">Generer 4 creas</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function launchVariantGeneration() {
+  const count = parseInt(document.getElementById('variant-count')?.value || '5');
+  state.showVariantModal = false;
+  renderPage();
+  // The actual endpoint will be built by Agent 1B
+  alert(`Lancement de ${count} variantes... (Backend Agent 1B en cours)`);
+}
+
+async function launchPersonaGeneration() {
+  state.showPersonaModal = false;
+  renderPage();
+  alert('Lancement generation 4 personas... (Backend Agent 1B en cours)');
+}
+
+function mountStudioModals() {
+  let container = document.getElementById('modal-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'modal-container';
+    document.body.appendChild(container);
+  }
+  container.innerHTML = (renderInsightModal() || '') + (renderVariantModal() || '') + (renderPersonaModal() || '');
+}
 
 // ---- Init ----
 async function init() {
