@@ -520,6 +520,14 @@ def build_prompt(brand_dna: str, product_name: str, aspect_ratio: str,
                 prompt = prompt + "\n" + bias
         except NameError:
             pass
+        try:
+            snippet = get_copy_pattern_snippet()
+            if snippet:
+                prompt = prompt + snippet
+        except NameError:
+            pass
+        except Exception:
+            pass
         return prompt
 
     # Determine the angle
@@ -823,6 +831,10 @@ async def lifespan(app: FastAPI):
     init_db()
     seed_mng_strategy()
     seed_defaults()
+    try:
+        export_expert_skill()
+    except Exception as e:
+        print(f"[expert-static] initial export failed: {e}")
     yield
 
 app = FastAPI(title="CreaFlow", lifespan=lifespan)
@@ -2254,6 +2266,11 @@ async def update_image_tags(image_id: str, request: Request):
         conn.execute("UPDATE generated_images SET tags=? WHERE id=?", (json.dumps(data["tags"]), image_id))
     if "status_tag" in data:
         conn.execute("UPDATE generated_images SET status_tag=? WHERE id=?", (data["status_tag"], image_id))
+        if data["status_tag"] == "winner":
+            try:
+                export_expert_skill()
+            except Exception:
+                pass
     if "naming" in data:
         conn.execute("UPDATE generated_images SET naming=? WHERE id=?", (data["naming"], image_id))
     conn.commit()
@@ -2330,6 +2347,11 @@ async def create_expert_insight(request: Request):
          json.dumps(data.get("tags", []))))
     conn.commit()
     conn.close()
+    # Auto-export skill
+    try:
+        export_expert_skill()
+    except Exception:
+        pass
     return {"id": iid}
 
 
@@ -3315,6 +3337,228 @@ async def build_brand_intel(request: Request):
     conn.commit()
     conn.close()
     return {"ok": True, "competitor": name, "creatives_added": count, "total_in_response": len(items)}
+
+
+# ===========================================================================
+# Expert Static — Auto-generated Skill exporter
+# ===========================================================================
+
+SKILL_DIR = Path.home() / ".claude" / "skills" / "expert-static"
+COPY_PATTERN_PATH = Path.home() / ".claude" / "skills" / "copy-pattern-library" / "SKILL.md"
+
+
+def get_copy_pattern_snippet() -> str:
+    """Read the user's existing copy-pattern-library skill (if exists) and return a short snippet."""
+    if COPY_PATTERN_PATH.exists():
+        try:
+            content = COPY_PATTERN_PATH.read_text(encoding="utf-8")
+            # Take first 1500 chars to avoid bloating the prompt
+            return f"\n\nCOPY PATTERNS MNG (skill copy-pattern-library):\n{content[:1500]}"
+        except Exception:
+            pass
+    return ""
+
+
+def _build_expert_skill_md() -> str:
+    """Compile all expert insights + winners + brand intel into a markdown skill file."""
+    conn = get_db()
+
+    # MNG winners
+    winners = conn.execute("""
+        SELECT gi.id, gi.tags, gi.prompt_used, gi.naming, p.name as persona_name, gi.status_tag
+        FROM generated_images gi
+        LEFT JOIN personas p ON p.id=gi.persona_id
+        WHERE gi.status_tag='winner'
+        ORDER BY gi.created_at DESC LIMIT 30
+    """).fetchall()
+
+    # Expert insights
+    insights = conn.execute("""
+        SELECT * FROM expert_insights ORDER BY created_at DESC
+    """).fetchall()
+
+    # Top brand intels
+    brand_intels = conn.execute("""
+        SELECT competitor_name, COUNT(*) as cnt FROM auto_briefs
+        WHERE competitor_name != ''
+        GROUP BY competitor_name
+        ORDER BY cnt DESC LIMIT 10
+    """).fetchall()
+
+    # Top patterns from auto_briefs (across all competitors)
+    briefs = conn.execute("SELECT detected_tags, extracted_headline FROM auto_briefs LIMIT 200").fetchall()
+    from collections import Counter
+    cross_hooks = Counter()
+    cross_angles = Counter()
+    sample_headlines = []
+    for b in briefs:
+        try:
+            tags = json.loads(b["detected_tags"] or "{}")
+            for h in tags.get("hook_type", []): cross_hooks[h] += 1
+            for a in tags.get("messaging_angle", []): cross_angles[a] += 1
+        except Exception:
+            pass
+        if b["extracted_headline"]:
+            sample_headlines.append(b["extracted_headline"])
+
+    conn.close()
+
+    # Build markdown
+    lines = []
+    lines.append("---")
+    lines.append("name: Expert Static — MNG Creative Analyst")
+    lines.append("description: Source de vérité auto-générée pour l'analyse créa publicitaire (statics). Patterns winners MNG + concurrents + insights expert. Auto-update à chaque nouveau winner ou insight ajouté dans Créa Studio. Charge ce skill dès qu'il faut analyser, briefer, ou générer une créa MNG (Brainstoorm, Focus, etc.) ou comparer aux concurrents (RYZE, Bonjour, French Mush, AG1...).")
+    lines.append(f"updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    lines.append("---")
+    lines.append("")
+    lines.append("# Expert Static — MNG Creative Analyst")
+    lines.append("")
+    lines.append("> Skill auto-généré par Créa Studio MNG. Il combine les patterns des winners MNG, les insights de l'expert (pourquoi ça marche), et les patterns dominants chez les concurrents trackés.")
+    lines.append("")
+    lines.append("## Quand l'utiliser")
+    lines.append("- Analyse d'une créa statique (MNG ou concurrent)")
+    lines.append("- Brief créatif pour une nouvelle génération")
+    lines.append("- Itération d'une créa existante (Andromeda-safe)")
+    lines.append("- Critique/audit d'un layout, hook, ou copy")
+    lines.append("- Comparaison MNG vs concurrents (RYZE, Bonjour, French Mush, AG1, Spacegoods, etc.)")
+    lines.append("")
+
+    # Section MNG winners
+    lines.append("## 🏆 Winners MNG actuels")
+    if winners:
+        lines.append(f"{len(winners)} créas MNG marquées 'winner' (CPA<27€ + 5+ achats).")
+        lines.append("")
+        for i, w in enumerate(winners[:10], 1):
+            try:
+                tags = json.loads(w["tags"] or "{}")
+                angle = ", ".join(tags.get("messaging_angle", [])) or "?"
+                hook = ", ".join(tags.get("hook_type", [])) or "?"
+                visual = ", ".join(tags.get("visual_format", [])) or "?"
+                lines.append(f"{i}. **{w['naming'] or 'créa-' + w['id'][:8]}** — angle: `{angle}` · hook: `{hook}` · visual: `{visual}` · persona: {w['persona_name'] or 'général'}")
+            except Exception:
+                lines.append(f"{i}. créa-{w['id'][:8]}")
+    else:
+        lines.append("_Aucun winner pour le moment. Marque des créas dans Studio (status=Winner) pour enrichir ce skill._")
+    lines.append("")
+
+    # Section insights expert
+    lines.append("## 💡 Insights expert — pourquoi ça marche")
+    if insights:
+        lines.append(f"{len(insights)} insights collectés dans Créa Studio.")
+        lines.append("")
+        # Group by pattern_type
+        by_type = {}
+        for i in insights:
+            pt = i["pattern_type"] or "other"
+            by_type.setdefault(pt, []).append(i)
+        type_labels = {
+            "hook_pattern": "🪝 Patterns de hook",
+            "layout": "🎨 Layouts / compositions",
+            "copy": "✍️ Copy / wording",
+            "offer": "💰 Offres / prix",
+            "other": "🔍 Autres",
+        }
+        for pt, items in by_type.items():
+            lines.append(f"### {type_labels.get(pt, pt)}")
+            for it in items[:8]:
+                src = "MNG" if it["source"] == "mng" else f"concurrent ({it['competitor_name']})"
+                lines.append(f"- **[{src}]** {it['why_it_works']}")
+            lines.append("")
+    else:
+        lines.append("_Aucun insight pour le moment. Ajoute des commentaires sur tes winners dans Studio (bouton 'Insight')._")
+    lines.append("")
+
+    # Section concurrents
+    lines.append("## 📊 Patterns concurrents")
+    if brand_intels:
+        lines.append(f"Marques trackées : {', '.join(b['competitor_name'] for b in brand_intels[:10])}")
+        lines.append("")
+        lines.append("### Hooks dominants (cross-marques)")
+        for h, c in cross_hooks.most_common(5):
+            lines.append(f"- `{h}` — {c} créas analysées")
+        lines.append("")
+        lines.append("### Angles dominants (cross-marques)")
+        for a, c in cross_angles.most_common(5):
+            lines.append(f"- `{a}` — {c} créas analysées")
+        lines.append("")
+        if sample_headlines:
+            lines.append("### Headlines exemples (concurrents)")
+            for h in sample_headlines[:10]:
+                lines.append(f"- \"{h[:120]}\"")
+            lines.append("")
+    else:
+        lines.append("_Aucun concurrent analysé. Va dans Concurrents et build le brand intel._")
+    lines.append("")
+
+    # Section directives
+    lines.append("## 🎯 Directives quand tu génères ou analyses pour MNG")
+    lines.append("")
+    lines.append("**Règles MNG (Ad Doctor) :**")
+    lines.append("- CPA target 27€ · breakeven 37€ · kill 45€")
+    lines.append("- Static > UGC/Video pour MNG (data 56j confirmée)")
+    lines.append("- Format winner: 4:5 statics avec hook pain point + product hero + trust bar")
+    lines.append("")
+    lines.append("**Iterations Andromeda-safe :**")
+    lines.append("- Niveau 1 (hook_rate < 15%) : nouveau hook, garder script")
+    lines.append("- Niveau 2 (freq monte) : nouveau visuel, garder hook")
+    lines.append("- Niveau 3 (freq > 3.2) : nouvel angle complet")
+    lines.append("- KILL (CPA > 45€) : ne pas itérer, partir sur autre concept")
+    lines.append("")
+    lines.append("**Personas MNG (4 par défaut) :**")
+    lines.append("- 🎯 Entrepreneur 30-45 (stress, focus, productivité)")
+    lines.append("- 👩 Active Woman 28-40 (ballonnements, ventre plat)")
+    lines.append("- 📚 Étudiant stressé 18-28 (concentration, anxiété)")
+    lines.append("- 💪 Sportif perfectionniste 25-45 (récup, performance)")
+    lines.append("")
+    lines.append("**Brand DNA (Brainstoorm) :**")
+    lines.append("- 6225mg adaptogènes (le + dosé de France)")
+    lines.append("- 3 champignons (Lion's Mane, Chaga, Cordyceps) + 3 plantes (Ashwagandha, Rhodiola, Maca)")
+    lines.append("- Caféine NewCaff® brevetée")
+    lines.append("- Pochon violet doypack (PAS de pots/bocaux)")
+    lines.append("")
+    lines.append("---")
+    lines.append(f"_Skill auto-généré le {datetime.now().strftime('%d/%m/%Y à %H:%M')}. Source : `~/Claude Code/creaflow/data/creaflow.db`_")
+
+    return "\n".join(lines)
+
+
+def export_expert_skill():
+    """Write the skill markdown to ~/.claude/skills/expert-static/SKILL.md"""
+    try:
+        SKILL_DIR.mkdir(parents=True, exist_ok=True)
+        skill_path = SKILL_DIR / "SKILL.md"
+        content = _build_expert_skill_md()
+        skill_path.write_text(content, encoding="utf-8")
+        return {"path": str(skill_path), "size": len(content), "ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/expert-static/export")
+async def api_export_expert_skill():
+    """Manually trigger skill export."""
+    return export_expert_skill()
+
+
+@app.get("/api/expert-static/preview")
+async def api_preview_expert_skill():
+    """Preview the markdown without writing it."""
+    return {"markdown": _build_expert_skill_md()}
+
+
+@app.get("/api/expert-static/status")
+async def api_expert_skill_status():
+    """Check if skill file exists + last modified."""
+    skill_path = SKILL_DIR / "SKILL.md"
+    if skill_path.exists():
+        from datetime import datetime as _dt
+        return {
+            "exists": True,
+            "path": str(skill_path),
+            "size": skill_path.stat().st_size,
+            "last_modified": _dt.fromtimestamp(skill_path.stat().st_mtime).isoformat(),
+        }
+    return {"exists": False}
 
 
 if __name__ == "__main__":

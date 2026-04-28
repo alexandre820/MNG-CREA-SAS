@@ -1523,6 +1523,19 @@ body {
           Concurrents
           <span style="margin-left:auto;font-size:9px;background:linear-gradient(135deg,#ef4444,#f97316);color:white;padding:2px 6px;border-radius:8px;font-weight:600;">HOT</span>
         </button>
+        <button class="nav-item" data-page="expert" onclick="navigate('expert')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 L15 8 L22 9 L17 14 L18 21 L12 18 L6 21 L7 14 L2 9 L9 8 Z"/></svg>
+          Expert Static
+          <span style="margin-left:auto;font-size:9px;background:linear-gradient(135deg,#a78bfa,#f9f784);color:#0a0a0f;padding:2px 6px;border-radius:8px;font-weight:700;">AI</span>
+        </button>
+        <button class="nav-item" data-page="ai-tasks" onclick="navigate('ai-tasks')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          AI Tasks
+        </button>
+        <button class="nav-item" data-page="snapshots" onclick="navigate('snapshots')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Snapshots
+        </button>
       </div>
 
       <div class="nav-section">
@@ -1631,6 +1644,9 @@ function renderPage() {
       case 'inspirations': renderInspirations(main); break;
       case 'trending': renderTrending(main); break;
       case 'competitors': renderCompetitors(main); break;
+      case 'expert': renderExpert(main); break;
+      case 'ai-tasks': renderAiTasks(main); break;
+      case 'snapshots': renderSnapshots(main); break;
       case 'settings': renderSettings(main); break;
     }
   } catch(e) {
@@ -3356,6 +3372,295 @@ function openTrendingDetail(adId) {
     </div>
   `;
   document.body.appendChild(modal);
+}
+
+
+// ===== EXPERT STATIC PAGE =====
+async function renderExpert(el) {
+  if (!state.expertData) state.expertData = { insights: [], status: null, learnings: null };
+
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Expert <em>Static</em></h1>
+        <p>Le skill auto-genere qui analyse tes creas. Plus tu marques de winners + insights, plus il devient malin.</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary" onclick="exportExpertSkill()">Re-exporter le skill</button>
+        <button class="btn btn-secondary" onclick="previewExpertSkill()">Preview markdown</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Etat du skill</div>
+      <div id="expert-status" style="padding:14px 0;color:var(--text2);">Chargement...</div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Learnings — winners actuels</div>
+      <div id="expert-learnings" style="padding:14px 0;color:var(--text2);">Chargement...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Insights collectes</div>
+      <div id="expert-insights" style="padding:14px 0;">Chargement...</div>
+    </div>
+  `;
+
+  loadExpertData();
+}
+
+async function loadExpertData() {
+  try {
+    const [status, learnings, insights] = await Promise.all([
+      api('/api/expert-static/status'),
+      api('/api/feedback-loop/learnings'),
+      api('/api/expert-insights'),
+    ]);
+
+    // Status
+    const statusEl = document.getElementById('expert-status');
+    if (statusEl) {
+      if (status.exists) {
+        const date = new Date(status.last_modified);
+        const ago = Math.round((Date.now() - date.getTime()) / 60000);
+        const agoStr = ago < 60 ? `${ago}min` : ago < 1440 ? `${Math.round(ago/60)}h` : `${Math.round(ago/1440)}j`;
+        statusEl.innerHTML = `
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:10px;height:10px;border-radius:50%;background:var(--green);box-shadow:0 0 12px var(--green);"></div>
+            <div>
+              <div style="color:var(--text);font-weight:600;">Skill actif</div>
+              <div style="font-size:12px;color:var(--text2);">${status.path} · MAJ il y a ${agoStr} · ${(status.size/1024).toFixed(1)} KB</div>
+            </div>
+          </div>
+        `;
+      } else {
+        statusEl.innerHTML = `<div style="color:var(--orange);">Skill non exporte. Clique sur "Re-exporter".</div>`;
+      }
+    }
+
+    // Learnings
+    const lEl = document.getElementById('expert-learnings');
+    if (lEl) {
+      if (learnings.winner_count === 0) {
+        lEl.innerHTML = `<div style="color:var(--text2);font-size:13px;">Aucun winner pour l'instant. Marque des creas dans Studio (status=Winner).</div>`;
+      } else {
+        const block = (title, items, key) => items && items.length ? `
+          <div style="margin-bottom:14px;">
+            <div style="font-size:11px;color:var(--accent-solid);font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">${title}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">
+              ${items.slice(0,5).map(i => `<span class="pill active">${i[key]} · ${i.count}</span>`).join('')}
+            </div>
+          </div>
+        ` : '';
+        lEl.innerHTML = `
+          <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">${learnings.winner_count} winner(s) analyses</div>
+          ${block('Top angles', learnings.top_angles, 'angle')}
+          ${block('Top hooks', learnings.top_hooks, 'hook')}
+          ${block('Top personas', learnings.top_personas, 'persona')}
+          ${block('Top visuals', learnings.top_visuals, 'visual')}
+        `;
+      }
+    }
+
+    // Insights
+    const iEl = document.getElementById('expert-insights');
+    if (iEl) {
+      if (insights.length === 0) {
+        iEl.innerHTML = `<div style="color:var(--text2);font-size:13px;">Aucun insight collecte. Va dans Studio puis bouton Insight sur tes winners.</div>`;
+      } else {
+        const typeLabels = {
+          hook_pattern: 'Hook',
+          layout: 'Layout',
+          copy: 'Copy',
+          offer: 'Offre',
+        };
+        iEl.innerHTML = `
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            ${insights.map(i => `
+              <div style="padding:12px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;">
+                <div style="display:flex;justify-content:space-between;align-items:start;gap:10px;margin-bottom:6px;">
+                  <div>
+                    <span style="font-size:11px;color:var(--accent-solid);font-weight:700;">${typeLabels[i.pattern_type]||i.pattern_type}</span>
+                    <span style="font-size:11px;color:var(--text3);margin-left:8px;">${i.source==='mng'?'MNG':(i.competitor_name||'Concurrent')}</span>
+                  </div>
+                  <button class="btn btn-ghost" style="font-size:11px;padding:3px 8px;" onclick="deleteInsight('${i.id}')">x</button>
+                </div>
+                <div style="color:var(--text);font-size:13px;line-height:1.5;">${i.why_it_works}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+    }
+  } catch (e) {
+    console.error('expert load failed', e);
+  }
+}
+
+async function exportExpertSkill() {
+  try {
+    const r = await fetch('/api/expert-static/export', {method:'POST'});
+    const data = await r.json();
+    if (data.ok) {
+      alert(`Skill exporte\n${data.path}\n${(data.size/1024).toFixed(1)} KB`);
+      loadExpertData();
+    } else {
+      alert('Erreur : ' + (data.error || 'inconnu'));
+    }
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+
+async function previewExpertSkill() {
+  const r = await api('/api/expert-static/preview');
+  // Show in modal
+  const m = document.createElement('div');
+  m.className = 'studio-modal-overlay';
+  m.onclick = (e) => { if (e.target === m) m.remove(); };
+  m.innerHTML = `
+    <div class="studio-modal-content" style="max-width:800px;max-height:90vh;overflow:auto;">
+      <h2>Preview SKILL.md</h2>
+      <pre style="white-space:pre-wrap;font-family:monospace;font-size:12px;background:var(--glass);padding:16px;border-radius:8px;color:var(--text);max-height:60vh;overflow:auto;">${(r.markdown||'').replace(/</g,'&lt;')}</pre>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="this.closest('.studio-modal-overlay').remove()">Fermer</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(m);
+}
+
+async function deleteInsight(id) {
+  if (!confirm('Supprimer cet insight ?')) return;
+  await fetch(`/api/expert-insights/${id}`, {method:'DELETE'});
+  loadExpertData();
+}
+
+
+// ===== AI TASKS PAGE =====
+async function renderAiTasks(el) {
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>AI <em>Tasks</em></h1>
+        <p>Workflows one-click. Analyse rapide de tes donnees.</p>
+      </div>
+    </div>
+    <div id="ai-tasks-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;">
+      <div style="color:var(--text2);">Chargement...</div>
+    </div>
+  `;
+  try {
+    const tasks = await api('/api/ai-tasks');
+    const grid = document.getElementById('ai-tasks-grid');
+    grid.innerHTML = tasks.map(t => `
+      <div class="card" style="padding:18px;">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px;">${t.name}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:12px;">${t.last_run ? 'Dernier run : ' + new Date(t.last_run).toLocaleString('fr-FR') : 'Jamais lance'}</div>
+        <button class="btn btn-primary" style="width:100%;font-size:12px;" onclick="runAiTask('${t.id}', '${(t.name||'').replace(/'/g,'')}')">Lancer</button>
+        <div id="ai-task-result-${t.id}" style="margin-top:12px;"></div>
+      </div>
+    `).join('');
+  } catch (e) {
+    document.getElementById('ai-tasks-grid').innerHTML = `<div style="color:var(--red);">Erreur : ${e.message}</div>`;
+  }
+}
+
+async function runAiTask(taskId, name) {
+  const out = document.getElementById('ai-task-result-' + taskId);
+  if (out) out.innerHTML = '<div style="color:var(--text2);font-size:12px;">Analyse...</div>';
+  try {
+    const r = await fetch(`/api/ai-tasks/${taskId}/run`, {method:'POST'});
+    const data = await r.json();
+    if (out) out.innerHTML = `
+      <div style="padding:10px;background:var(--glass);border-radius:8px;font-size:12px;color:var(--text);">
+        <pre style="white-space:pre-wrap;font-family:monospace;font-size:11px;color:var(--text2);">${JSON.stringify(data.result, null, 2)}</pre>
+      </div>
+    `;
+  } catch (e) {
+    if (out) out.innerHTML = `<div style="color:var(--red);font-size:12px;">${e.message}</div>`;
+  }
+}
+
+
+// ===== SNAPSHOTS PAGE =====
+async function renderSnapshots(el) {
+  el.innerHTML = `
+    <div class="page-header">
+      <div>
+        <h1>Snapshots <em>partageables</em></h1>
+        <p>Cree un lien public pour partager un report (Studio, Concurrents, Brand Intel...).</p>
+      </div>
+      <button class="btn btn-primary" onclick="createSnapshot()">Nouveau snapshot</button>
+    </div>
+    <div id="snapshots-list" style="display:flex;flex-direction:column;gap:12px;">
+      Chargement...
+    </div>
+  `;
+  loadSnapshots();
+}
+
+async function loadSnapshots() {
+  const list = document.getElementById('snapshots-list');
+  if (!list) return;
+  try {
+    const items = await api('/api/snapshots');
+    if (items.length === 0) {
+      list.innerHTML = `<div class="card" style="text-align:center;padding:40px;color:var(--text2);">Aucun snapshot. Cree-en un.</div>`;
+      return;
+    }
+    list.innerHTML = items.map(s => {
+      const url = `${location.origin}/s/${s.public_token}`;
+      return `
+        <div class="card" style="padding:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <div>
+            <div style="font-weight:600;color:var(--text);">${s.name}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px;">
+              ${s.type} · ${s.is_live ? 'LIVE' : 'fige'} · ${new Date(s.created_at).toLocaleString('fr-FR')}
+            </div>
+            <div style="font-size:11px;color:var(--accent-solid);margin-top:6px;font-family:monospace;cursor:pointer;" onclick="navigator.clipboard.writeText('${url}');this.textContent='Copie'">${url}</div>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost" onclick="window.open('${url}','_blank')">Ouvrir</button>
+            <button class="btn btn-ghost" onclick="deleteSnapshot('${s.id}')">x</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = `<div style="color:var(--red);">Erreur : ${e.message}</div>`;
+  }
+}
+
+async function createSnapshot() {
+  const name = prompt('Nom du snapshot :');
+  if (!name) return;
+  const type = prompt('Type (studio | trending | brand_intel) :', 'studio') || 'studio';
+  // For studio: dump current studio winners
+  let payload = {};
+  try {
+    if (type === 'studio') {
+      const imgs = await api('/api/generations');
+      payload = { generations: imgs };
+    } else if (type === 'brand_intel') {
+      const intels = await api('/api/brand-intel');
+      payload = { intels };
+    }
+  } catch(e) {}
+
+  const res = await fetch('/api/snapshots', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, type, payload, is_live: 0 }),
+  });
+  const data = await res.json();
+  alert(`Snapshot cree\nLien : ${location.origin}${data.url}`);
+  loadSnapshots();
+}
+
+async function deleteSnapshot(id) {
+  if (!confirm('Supprimer ce snapshot ?')) return;
+  await fetch(`/api/snapshots/${id}`, {method:'DELETE'});
+  loadSnapshots();
 }
 
 
